@@ -1,6 +1,8 @@
-#CubeSter
+#CubeSter by Jacob Morris
 Original Author: Jacob Morris
+
 Email Address: blendingjake@gmail.com
+
 URL: blendingjacob.blogspot.com
 
 CubeSter is an add-on for Blender 3D that takes an image and converts it into

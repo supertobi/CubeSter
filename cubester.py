@@ -4,7 +4,7 @@ bl_info = {
     "version" : (0, 1),
     "blender" : (2, 76, 0),
     "location" : "View 3D > Toolbar > CubeSter",
-    "description" : "Take image and convert it into a height map based on pixel color/intensity",
+    "description" : "Takes image and converts it into a height map based on pixel color and alpha values",
     "category" : "Add Mesh"
     }
     
@@ -21,6 +21,7 @@ def adjustSelectedImage(self, context):
     except:
         print("CubeSter: " + scene.cubester_load_image + " could not be loaded")
 
+#scene properties
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
 bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks", subtype =  "DISTANCE", min = 0.001, max = 2, default = 1)

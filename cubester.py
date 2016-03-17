@@ -91,27 +91,32 @@ class CubeSter(bpy.types.Operator):
 
         start = timeit.default_timer()                 
 
-        for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):
-            x = -width / 2 + step_x / 2
+        #go through each row of pixels stepping by scene.cubester_skip_pixels + 1
+        for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):           
+            x = -width / 2 + step_x / 2 #reset to left edge of mesh
+            #go through each column, step by appropriate amount
             for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):        
-                i = (row * picture.size[0] * 4) + column                 
-                pixs = pixels[i:i+3]       
+                i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
+                pixs = pixels[i:i+4]       
                 r = pixs[0]
                 g = pixs[1]
                 b = pixs[2] 
-                vert_colors += [(r, g, b) for i in range(24)]
+                a = pixs[3]
                 
-                if scene.cubester_invert:
-                    h = (1 - (0.33 * r + 0.33 * g + 0.33 * b)) * scene.cubester_height_scale
-                else:
-                    h = (0.33 * r + 0.33 * g + 0.33 * b) * scene.cubester_height_scale
+                if a != 0: #transparent
+                    vert_colors += [(r, g, b) for i in range(24)]
+                    
+                    if scene.cubester_invert:
+                        h = (1 - (0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a)) * scene.cubester_height_scale
+                    else:
+                        h = (0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a) * scene.cubester_height_scale
 
-                p = len(verts)
-                verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
-                verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
-                
-                faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
-                    (p, p+3, p+2, p+1)]
+                    p = len(verts)
+                    verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
+                    verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
+                    
+                    faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
+                        (p, p+3, p+2, p+1)]
                     
                 x += step_x
                 

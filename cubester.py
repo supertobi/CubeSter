@@ -12,6 +12,7 @@ import bpy
 from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty
 import timeit 
 
+#load image if needed
 def adjustSelectedImage(self, context):
     scene = context.scene
     try:
@@ -55,13 +56,16 @@ class CubeSterPanel(bpy.types.Panel):
             columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))            
             layout.label("Approximate Cube Count: " + str(rows * columns))
             
-            time = rows * columns * 0.000062873 + 0.10637
+            time = rows * columns * 0.000062873 + 0.10637 #approximate time count
             time_mod = "s"
-            if time > 60:
+            if time > 60: #convert to minutes if needed
                 time /= 60
                 time_mod = "min"
             time = round(time, 3)
             layout.label("Expected Time: " + str(time) + " " + time_mod)
+            
+            #expected vert/face count
+            layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
     
 class CubeSter(bpy.types.Operator):
     bl_idname = "mesh.cubester"
@@ -72,7 +76,7 @@ class CubeSter(bpy.types.Operator):
         scene = bpy.context.scene
         picture = bpy.data.images[scene.cubester_image]
         pixels = list(picture.pixels)
-
+        
         x_pixels = picture.size[0] / (scene.cubester_skip_pixels + 1)
         y_pixels = picture.size[1] / (scene.cubester_skip_pixels + 1)
 
@@ -103,7 +107,7 @@ class CubeSter(bpy.types.Operator):
                 b = pixs[2] 
                 a = pixs[3]
                 
-                if a != 0: #transparent
+                if a != 0: #if not completely transparent
                     vert_colors += [(r, g, b) for i in range(24)]
                     
                     if scene.cubester_invert:
@@ -111,7 +115,7 @@ class CubeSter(bpy.types.Operator):
                     else:
                         h = (0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a) * scene.cubester_height_scale
 
-                    p = len(verts)
+                    p = len(verts)              
                     verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
                     verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
                     

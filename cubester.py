@@ -17,7 +17,7 @@
 bl_info = {
     "name" : "CubeSter",
     "author" : "Jacob Morris",
-    "version" : (0, 1),
+    "version" : (0, 1, 1),
     "blender" : (2, 76, 0),
     "location" : "View 3D > Toolbar > CubeSter",
     "description" : "Takes image and converts it into a height map based on pixel color and alpha values",
@@ -151,17 +151,18 @@ class CubeSter(bpy.types.Operator):
         ob.select = True
         
         #material
-        if "CubeSter" in bpy.data.materials:
-            ob.data.materials.append(bpy.data.materials["CubeSter"])
-        else:
-            mat = bpy.data.materials.new("CubeSter")
-            mat.use_nodes = True
-            nodes = mat.node_tree.nodes            
-            att = nodes.new("ShaderNodeAttribute")
-            att.attribute_name = "Col"
-            att.location = (-200, 300)
-            mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
-            ob.data.materials.append(mat)
+        if context.scene.render.engine == "CYCLES":
+            if "CubeSter" in bpy.data.materials:
+                ob.data.materials.append(bpy.data.materials["CubeSter"])
+            else:
+                mat = bpy.data.materials.new("CubeSter")
+                mat.use_nodes = True
+                nodes = mat.node_tree.nodes            
+                att = nodes.new("ShaderNodeAttribute")
+                att.attribute_name = "Col"
+                att.location = (-200, 300)
+                mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
+                ob.data.materials.append(mat)
 
         #vertex colors
         bpy.ops.mesh.vertex_color_add()        

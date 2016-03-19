@@ -45,6 +45,14 @@ bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", sub
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
 
+#advanced
+bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
+bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
+bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_g = FloatProperty(name = "Green", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_b = FloatProperty(name = "Blue", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_a = FloatProperty(name = "Alpha", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
+
 class CubeSterPanel(bpy.types.Panel):
     bl_idname = "OBJECT_PT.cubester"
     bl_label = "CubeSter"
@@ -83,6 +91,21 @@ class CubeSterPanel(bpy.types.Panel):
             
             #expected vert/face count
             layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
+            
+        #advanced
+        layout.separator()
+        layout.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
+        if bpy.context.scene.cubester_advanced:
+            layout.prop(scene, "cubester_random_weights", icon = "RNDCURVE")
+            layout.separator()
+            
+            if not bpy.context.scene.cubester_random_weights:
+                box = layout.box()
+                box.label("RGBA Channel Weights", icon = "COLOR")
+                box.prop(scene, "cubester_weight_r")
+                box.prop(scene, "cubester_weight_g")
+                box.prop(scene, "cubester_weight_b")
+                box.prop(scene, "cubester_weight_a")
     
 class CubeSter(bpy.types.Operator):
     bl_idname = "mesh.cubester"

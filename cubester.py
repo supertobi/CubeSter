@@ -49,10 +49,10 @@ bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load 
 #advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
-bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
-bpy.types.Scene.cubester_weight_g = FloatProperty(name = "Green", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
-bpy.types.Scene.cubester_weight_b = FloatProperty(name = "Blue", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
-bpy.types.Scene.cubester_weight_a = FloatProperty(name = "Alpha", subtype = "FACTOR", min = 0, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_g = FloatProperty(name = "Green", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_b = FloatProperty(name = "Blue", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
+bpy.types.Scene.cubester_weight_a = FloatProperty(name = "Alpha", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
 
 class CubeSterPanel(bpy.types.Panel):
     bl_idname = "OBJECT_PT.cubester"
@@ -134,7 +134,8 @@ class CubeSter(bpy.types.Operator):
         verts, faces = [], []
         vert_colors = []
 
-        start = timeit.default_timer()                 
+        start = timeit.default_timer()  
+        weights = [uniform(0.0, 1.0) for i in range(4)] #random weights               
 
         #go through each row of pixels stepping by scene.cubester_skip_pixels + 1
         for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):           
@@ -163,8 +164,7 @@ class CubeSter(bpy.types.Operator):
                             total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
                             normalize = 1 / total
                         #random weighting
-                        else:
-                            weights = [uniform(0.0, 1.0) for i in range(4)]
+                        else:                           
                             composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a
                             total = weights[0] + weights[1] + weights[2] + weights[3] 
                             normalize = 1 / total  

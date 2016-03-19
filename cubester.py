@@ -157,10 +157,12 @@ class CubeSter(bpy.types.Operator):
                         composed = 0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a
                         total = 1
                     else:
+                        #user defined weighting
                         if not scene.cubester_random_weights:
                             composed = scene.cubester_weight_r * r + scene.cubester_weight_g * g + scene.cubester_weight_b * b + scene.cubester_weight_a * a
                             total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
                             normalize = 1 / total
+                        #random weighting
                         else:
                             weights = [uniform(0.0, 1.0) for i in range(4)]
                             composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a

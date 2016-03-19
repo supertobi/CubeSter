@@ -27,6 +27,7 @@ bl_info = {
 import bpy
 from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty
 import timeit 
+from random import uniform
 
 #load image if needed
 def adjustSelectedImage(self, context):
@@ -149,11 +150,27 @@ class CubeSter(bpy.types.Operator):
                 
                 if a != 0: #if not completely transparent
                     vert_colors += [(r, g, b) for i in range(24)]
+                    normalize = 1
                     
-                    if scene.cubester_invert:
-                        h = (1 - (0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a)) * scene.cubester_height_scale
+                    #channel weighting
+                    if not scene.cubester_advanced:
+                        composed = 0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a
+                        total = 1
                     else:
-                        h = (0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a) * scene.cubester_height_scale
+                        if not scene.cubester_random_weights:
+                            composed = scene.cubester_weight_r * r + scene.cubester_weight_g * g + scene.cubester_weight_b * b + scene.cubester_weight_a * a
+                            total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
+                            normalize = 1 / total
+                        else:
+                            weights = [uniform(0.0, 1.0) for i in range(4)]
+                            composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a
+                            total = weights[0] + weights[1] + weights[2] + weights[3] 
+                            normalize = 1 / total  
+                            
+                    if scene.cubester_invert:
+                        h = (1 - composed) * scene.cubester_height_scale * normalize
+                    else:
+                        h = composed * scene.cubester_height_scale * normalize
 
                     p = len(verts)              
                     verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  

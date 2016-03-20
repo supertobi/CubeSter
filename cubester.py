@@ -38,6 +38,15 @@ def adjustSelectedImage(self, context):
     except:
         print("CubeSter: " + scene.cubester_load_image + " could not be loaded")
 
+#crate block at center position x, y with block width 2*hx and 2*hy and height of h    
+def createBlock(x, y, hx, hy, h, verts, faces):
+    p = len(verts)              
+    verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
+    verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
+    
+    faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
+        (p, p+3, p+2, p+1)]
+
 #scene properties
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
@@ -45,7 +54,7 @@ bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Pe
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
-
+bpy.types.Scene.cubester_blocks_plane = BoolProperty(name = "Blocks?", default = True)
 #advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
@@ -73,6 +82,9 @@ class CubeSterPanel(bpy.types.Panel):
         layout.prop(scene, "cubester_size_per_hundred_pixels")
         layout.prop(scene, "cubester_height_scale")
         layout.prop(scene, "cubester_invert", icon = "FILE_REFRESH")                 
+        
+        layout.separator()
+        layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")
         
         layout.separator()
         layout.operator("mesh.cubester", icon = "OBJECT_DATA")       
@@ -135,10 +147,12 @@ class CubeSter(bpy.types.Operator):
         vert_colors = []
 
         start = timeit.default_timer()  
-        weights = [uniform(0.0, 1.0) for i in range(4)] #random weights               
+        weights = [uniform(0.0, 1.0) for i in range(4)] #random weights  
+        rows = 0             
 
         #go through each row of pixels stepping by scene.cubester_skip_pixels + 1
-        for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):           
+        for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1): 
+            rows += 1          
             x = -width / 2 + step_x / 2 #reset to left edge of mesh
             #go through each column, step by appropriate amount
             for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):        
@@ -149,8 +163,7 @@ class CubeSter(bpy.types.Operator):
                 b = pixs[2] 
                 a = pixs[3]
                 
-                if a != 0: #if not completely transparent
-                    vert_colors += [(r, g, b) for i in range(24)]
+                if a != 0: #if not completely transparent                    
                     normalize = 1
                     
                     #channel weighting
@@ -173,17 +186,28 @@ class CubeSter(bpy.types.Operator):
                         h = (1 - composed) * scene.cubester_height_scale * normalize
                     else:
                         h = composed * scene.cubester_height_scale * normalize
-
-                    p = len(verts)              
-                    verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
-                    verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
                     
-                    faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
-                        (p, p+3, p+2, p+1)]
-                    
+                    if scene.cubester_blocks_plane:
+                        createBlock(x, y, hx, hy, h, verts, faces)
+                        vert_colors += [(r, g, b) for i in range(24)]
+                    else:
+                        verts += [(x, y, h)]
+                        vert_colors += [(r, g, b) for i in range(4)]
+                        
                 x += step_x
                 
             y += step_y
+            
+            #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
+            if not scene.cubester_blocks_plane:
+                del vert_colors[len(vert_colors) - 4:len(vert_colors)]
+            
+        #create faces if plane based and not block based
+        if not scene.cubester_blocks_plane:
+            off = int(len(verts) / rows)
+            for r in range(rows - 1):
+                for c in range(off - 1):
+                    faces += [(r * off + c, r * off + c + 1, (r + 1) * off + c + 1, (r + 1) * off + c)]                
                   
         mesh = bpy.data.meshes.new("cubed")
         mesh.from_pydata(verts, [], faces)

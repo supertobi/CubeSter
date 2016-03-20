@@ -91,10 +91,18 @@ class CubeSterPanel(bpy.types.Panel):
         
         if scene.cubester_image in bpy.data.images:
             rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
-            columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))            
-            layout.label("Approximate Cube Count: " + str(rows * columns))
+            columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))
             
-            time = rows * columns * 0.000062873 + 0.10637 #approximate time count
+            if scene.cubester_blocks_plane:           
+                layout.label("Approximate Cube Count: " + str(rows * columns))
+            else:
+                layout.label("Approximate Point Count: " + str(rows * columns))
+            
+            if scene.cubester_blocks_plane:
+                time = rows * columns * 0.000062873 + 0.10637 #approximate time count for blocks
+            else:
+                time = rows * columns * 0.000016688 + 0.02718 #approximate time count for mesh
+                
             time_mod = "s"
             if time > 60: #convert to minutes if needed
                 time /= 60
@@ -103,7 +111,10 @@ class CubeSterPanel(bpy.types.Panel):
             layout.label("Expected Time: " + str(time) + " " + time_mod)
             
             #expected vert/face count
-            layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
+            if scene.cubester_blocks_plane:           
+                layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
+            else:
+                layout.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
             
         #advanced
         layout.separator()
@@ -190,8 +201,8 @@ class CubeSter(bpy.types.Operator):
                     if scene.cubester_blocks_plane:
                         createBlock(x, y, hx, hy, h, verts, faces)
                         vert_colors += [(r, g, b) for i in range(24)]
-                    else:
-                        verts += [(x, y, h)]
+                    else:                            
+                        verts += [(x, y, h)]                                 
                         vert_colors += [(r, g, b) for i in range(4)]
                         
                 x += step_x
@@ -237,8 +248,14 @@ class CubeSter(bpy.types.Operator):
             c.color = vert_colors[i]
             i += 1
 
-        stop = timeit.default_timer() 
-        print(str(int(len(verts) / 8)) + " in " + str(stop - start))               
+        stop = timeit.default_timer()
+        
+        #print time data
+        if scene.cubester_blocks_plane:
+            print("CubeSter: " + str(int(len(verts) / 8)) + " blocks in " + str(stop - start)) 
+        else:
+            print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))                   
+        
         return {"FINISHED"}               
         
 def register():

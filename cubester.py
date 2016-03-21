@@ -25,9 +25,10 @@ bl_info = {
     }
     
 import bpy
-from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty
+from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty, EnumProperty
 import timeit 
 from random import uniform
+import bmesh
 
 #load image if needed
 def adjustSelectedImage(self, context):
@@ -46,6 +47,40 @@ def createBlock(x, y, hx, hy, h, verts, faces):
     
     faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
         (p, p+3, p+2, p+1)]
+ 
+#generate uv map for object       
+def createUVMap(context, rows, columns):
+    mesh = context.object.data
+    mesh.uv_textures.new("cubester")
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    
+    uv_layer = bm.loops.layers.uv[0]
+    bm.faces.ensure_lookup_table()
+    scale = 0.05
+    
+    y_pos = 0.0  
+    x_pos = 0.0 
+    count = columns - 1 #hold current count to compare to if need to go to next row
+    
+    #if blocks
+    if context.scene.cubester_blocks_plane == "blocks":        
+        for fa in range(int(len(bm.faces) / 6)):        
+            for i in range(6):
+                pos = (fa * 6) + i
+                bm.faces[pos].loops[0][uv_layer].uv = (x_pos, y_pos)
+                bm.faces[pos].loops[1][uv_layer].uv = (x_pos + scale, y_pos)                    
+                bm.faces[pos].loops[2][uv_layer].uv = (x_pos + scale, y_pos + scale)
+                bm.faces[pos].loops[3][uv_layer].uv = (x_pos, y_pos + scale)
+                        
+            x_pos += scale
+            
+            if fa >= count:            
+                y_pos += scale
+                x_pos = 0.0
+                count += columns
+                    
+    bm.to_mesh(mesh)              
 
 #scene properties
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
@@ -54,7 +89,8 @@ bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Pe
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
-bpy.types.Scene.cubester_blocks_plane = BoolProperty(name = "Blocks?", default = True)
+bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
+bpy.types.Scene.cubester_materials = EnumProperty(name = "Materials", items = (("vertex", "Vertex Colors", ""), ("uv", "UV Map", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 #advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
@@ -85,6 +121,7 @@ class CubeSterPanel(bpy.types.Panel):
         
         layout.separator()
         layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")
+        layout.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         layout.separator()
         layout.operator("mesh.cubester", icon = "OBJECT_DATA")       
@@ -93,12 +130,12 @@ class CubeSterPanel(bpy.types.Panel):
             rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
             columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))
             
-            if scene.cubester_blocks_plane:           
+            if scene.cubester_blocks_plane == "blocks":           
                 layout.label("Approximate Cube Count: " + str(rows * columns))
             else:
                 layout.label("Approximate Point Count: " + str(rows * columns))
             
-            if scene.cubester_blocks_plane:
+            if scene.cubester_blocks_plane == "blocks":
                 time = rows * columns * 0.000062873 + 0.10637 #approximate time count for blocks
             else:
                 time = rows * columns * 0.000016688 + 0.02718 #approximate time count for mesh
@@ -111,7 +148,7 @@ class CubeSterPanel(bpy.types.Panel):
             layout.label("Expected Time: " + str(time) + " " + time_mod)
             
             #expected vert/face count
-            if scene.cubester_blocks_plane:           
+            if scene.cubester_blocks_plane == "blocks":           
                 layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
             else:
                 layout.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
@@ -198,7 +235,7 @@ class CubeSter(bpy.types.Operator):
                     else:
                         h = composed * scene.cubester_height_scale * normalize
                     
-                    if scene.cubester_blocks_plane:
+                    if scene.cubester_blocks_plane == "blocks":
                         createBlock(x, y, hx, hy, h, verts, faces)
                         vert_colors += [(r, g, b) for i in range(24)]
                     else:                            
@@ -210,11 +247,11 @@ class CubeSter(bpy.types.Operator):
             y += step_y
             
             #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
-            if not scene.cubester_blocks_plane:
+            if scene.cubester_blocks_plane == "plane":
                 del vert_colors[len(vert_colors) - 4:len(vert_colors)]
             
         #create faces if plane based and not block based
-        if not scene.cubester_blocks_plane:
+        if scene.cubester_blocks_plane == "plane":
             off = int(len(verts) / rows)
             for r in range(rows - 1):
                 for c in range(off - 1):
@@ -227,8 +264,12 @@ class CubeSter(bpy.types.Operator):
         bpy.context.scene.objects.active = ob        
         ob.select = True
         
+        #uv unwrap?
+        if scene.cubester_materials == "uv":
+            createUVMap(context, rows, int(len(faces) / 6 / rows))
+        
         #material
-        if context.scene.render.engine == "CYCLES":
+        if scene.render.engine == "CYCLES":
             if "CubeSter" in bpy.data.materials:
                 ob.data.materials.append(bpy.data.materials["CubeSter"])
             else:
@@ -251,7 +292,7 @@ class CubeSter(bpy.types.Operator):
         stop = timeit.default_timer()
         
         #print time data
-        if scene.cubester_blocks_plane:
+        if scene.cubester_blocks_plane == "blocks":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks in " + str(stop - start)) 
         else:
             print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))                   

@@ -17,7 +17,7 @@
 bl_info = {
     "name" : "CubeSter",
     "author" : "Jacob Morris",
-    "version" : (0, 2),
+    "version" : (0, 3),
     "blender" : (2, 76, 0),
     "location" : "View 3D > Toolbar > CubeSter",
     "description" : "Takes image and converts it into a height map based on pixel color and alpha values",
@@ -30,7 +30,7 @@ import timeit
 from random import uniform
 import bmesh
 
-#load image if needed
+#load image if possible
 def adjustSelectedImage(self, context):
     scene = context.scene
     try:
@@ -38,6 +38,15 @@ def adjustSelectedImage(self, context):
         scene.cubester_image = image.name
     except:
         print("CubeSter: " + scene.cubester_load_image + " could not be loaded")
+
+#load color image if possible        
+def adjustSelectedColorImage(self, context):
+    scene = context.scene
+    try:
+        image = bpy.data.images.load(scene.cubester_load_color_image)
+        scene.cubester_color_image = image.name
+    except:
+        print("CubeSter: " + scene.cubester_load_color_image + " could not be loaded")
 
 #crate block at center position x, y with block width 2*hx and 2*hy and height of h    
 def createBlock(x, y, hx, hy, h, verts, faces):
@@ -107,7 +116,12 @@ bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", sub
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
 bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
+
+#material based stuff
 bpy.types.Scene.cubester_materials = EnumProperty(name = "Materials", items = (("vertex", "Vertex Colors", ""), ("uv", "UV Map", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
+bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
+bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
+bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
 #advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
@@ -139,6 +153,15 @@ class CubeSterPanel(bpy.types.Panel):
         layout.separator()
         layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")
         layout.prop(scene, "cubester_materials", icon = "MATERIAL")
+        
+        #if using uvs for image, then give option to use different image for color
+        if scene.cubester_materials == "uv":
+            layout.separator()
+            layout.prop(scene, "cubester_use_image_color", icon = "COLOR")
+            
+            if not scene.cubester_use_image_color:
+                layout.prop_search(scene, "cubester_color_image", bpy.data, "images")
+                layout.prop(scene, "cubester_load_color_image")   
         
         layout.separator()
         layout.operator("mesh.cubester", icon = "OBJECT_DATA")       
@@ -305,15 +328,24 @@ class CubeSter(bpy.types.Operator):
                     ob.data.materials.append(mat)
                     
             else:
-                if ("CubeSter_" + scene.cubester_image)  in bpy.data.materials:
-                    ob.data.materials.append(bpy.data.materials["CubeSter_" + scene.cubester_image])
+                #figure out what to name material
+                if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
+                    image_name = scene.cubester_color_image
                 else:
-                    mat = bpy.data.materials.new("CubeSter_" + scene.cubester_image)
+                    image_name = scene.cubester_image
+                    
+                if ("CubeSter_" + image_name)  in bpy.data.materials:
+                    ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
+                else:
+                    mat = bpy.data.materials.new("CubeSter_" + image_name)
                     mat.use_nodes = True
                     nodes = mat.node_tree.nodes
                     
                     att = nodes.new("ShaderNodeTexImage")
-                    att.image = bpy.data.images[scene.cubester_image]
+                    if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
+                        att.image = bpy.data.images[scene.cubester_color_image]
+                    else:
+                        att.image = bpy.data.images[scene.cubester_image]
                     att.location = (-200, 300)
                     mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
                     

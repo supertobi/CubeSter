@@ -57,10 +57,12 @@ def createUVMap(context, rows, columns):
     
     uv_layer = bm.loops.layers.uv[0]
     bm.faces.ensure_lookup_table()
-    scale = 0.05
     
-    y_pos = 0.0  
-    x_pos = 0.0     
+    x_scale = 1 / columns
+    y_scale = 1 / rows
+    
+    y_pos = 0.0
+    x_pos = 0.0
     count = columns - 1 #hold current count to compare to if need to go to next row
     
     #if blocks
@@ -69,14 +71,14 @@ def createUVMap(context, rows, columns):
             for i in range(6):
                 pos = (fa * 6) + i
                 bm.faces[pos].loops[0][uv_layer].uv = (x_pos, y_pos)
-                bm.faces[pos].loops[1][uv_layer].uv = (x_pos + scale, y_pos)                    
-                bm.faces[pos].loops[2][uv_layer].uv = (x_pos + scale, y_pos + scale)
-                bm.faces[pos].loops[3][uv_layer].uv = (x_pos, y_pos + scale)
+                bm.faces[pos].loops[1][uv_layer].uv = (x_pos + x_scale, y_pos)                    
+                bm.faces[pos].loops[2][uv_layer].uv = (x_pos + x_scale, y_pos + y_scale)
+                bm.faces[pos].loops[3][uv_layer].uv = (x_pos, y_pos + y_scale)
                         
-            x_pos += scale
+            x_pos += x_scale
             
             if fa >= count:            
-                y_pos += scale
+                y_pos += y_scale
                 x_pos = 0.0
                 count += columns
     
@@ -84,14 +86,14 @@ def createUVMap(context, rows, columns):
     else:
         for fa in range(len(bm.faces)):
             bm.faces[fa].loops[0][uv_layer].uv = (x_pos, y_pos)
-            bm.faces[fa].loops[1][uv_layer].uv = (x_pos + scale, y_pos)                    
-            bm.faces[fa].loops[2][uv_layer].uv = (x_pos + scale, y_pos + scale)
-            bm.faces[fa].loops[3][uv_layer].uv = (x_pos, y_pos + scale) 
+            bm.faces[fa].loops[1][uv_layer].uv = (x_pos + x_scale, y_pos)                    
+            bm.faces[fa].loops[2][uv_layer].uv = (x_pos + x_scale, y_pos + y_scale)
+            bm.faces[fa].loops[3][uv_layer].uv = (x_pos, y_pos + y_scale) 
             
-            x_pos += scale 
+            x_pos += x_scale 
             
             if fa >= count:            
-                y_pos += scale
+                y_pos += y_scale
                 x_pos = 0.0
                 count += columns  
                     

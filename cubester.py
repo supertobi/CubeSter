@@ -176,10 +176,15 @@ class CubeSterPanel(bpy.types.Panel):
             else:
                 layout.label("Approximate Point Count: " + str(rows * columns))
             
+            #blocks and plane time values
             if scene.cubester_blocks_plane == "blocks":
-                time = rows * columns * 0.000062873 + 0.10637 #approximate time count for blocks
+                slope = 0.0000876958
+                intercept = 0.02501
             else:
-                time = rows * columns * 0.000016688 + 0.02718 #approximate time count for mesh
+                slope = 0.000017753
+                intercept = 0.04201
+            
+            time = rows * columns * slope + intercept #approximate time count for mesh
                 
             time_mod = "s"
             if time > 60: #convert to minutes if needed

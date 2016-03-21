@@ -111,14 +111,14 @@ def createUVMap(context, rows, columns):
 #scene properties
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
-bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks", subtype =  "DISTANCE", min = 0.001, max = 2, default = 1)
+bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks/Points", subtype =  "DISTANCE", min = 0.001, max = 2, default = 1)
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
 bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
 
 #material based stuff
-bpy.types.Scene.cubester_materials = EnumProperty(name = "Materials", items = (("vertex", "Vertex Colors", ""), ("uv", "UV Map", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
+bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("uv", "UV Map", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
@@ -160,6 +160,7 @@ class CubeSterPanel(bpy.types.Panel):
             layout.prop(scene, "cubester_use_image_color", icon = "COLOR")
             
             if not scene.cubester_use_image_color:
+                layout.label("Image To Use For Colors:")
                 layout.prop_search(scene, "cubester_color_image", bpy.data, "images")
                 layout.prop(scene, "cubester_load_color_image")   
         

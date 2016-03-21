@@ -283,8 +283,7 @@ class CubeSter(bpy.types.Operator):
                         verts += [(x, y, h)]                                 
                         vert_colors += [(r, g, b) for i in range(4)]
                         
-                x += step_x
-                
+                x += step_x                
             y += step_y
             
             #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
@@ -324,9 +323,10 @@ class CubeSter(bpy.types.Operator):
             #either add material or create   
             if ("CubeSter_" + image_name)  in bpy.data.materials:
                 ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
+            
             #create material
             else:
-                #add all nodes, only link ones specific
+                #add all nodes, only link ones needed
                 mat = bpy.data.materials.new("CubeSter_" + image_name)
                 mat.use_nodes = True
                 nodes = mat.node_tree.nodes 

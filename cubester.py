@@ -17,7 +17,7 @@
 bl_info = {
     "name" : "CubeSter",
     "author" : "Jacob Morris",
-    "version" : (0, 1, 1),
+    "version" : (0, 2),
     "blender" : (2, 76, 0),
     "location" : "View 3D > Toolbar > CubeSter",
     "description" : "Takes image and converts it into a height map based on pixel color and alpha values",

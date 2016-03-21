@@ -60,11 +60,11 @@ def createUVMap(context, rows, columns):
     scale = 0.05
     
     y_pos = 0.0  
-    x_pos = 0.0 
+    x_pos = 0.0     
     count = columns - 1 #hold current count to compare to if need to go to next row
     
     #if blocks
-    if context.scene.cubester_blocks_plane == "blocks":        
+    if context.scene.cubester_blocks_plane == "blocks":              
         for fa in range(int(len(bm.faces) / 6)):        
             for i in range(6):
                 pos = (fa * 6) + i
@@ -79,6 +79,21 @@ def createUVMap(context, rows, columns):
                 y_pos += scale
                 x_pos = 0.0
                 count += columns
+    
+    #if planes
+    else:
+        for fa in range(len(bm.faces)):
+            bm.faces[fa].loops[0][uv_layer].uv = (x_pos, y_pos)
+            bm.faces[fa].loops[1][uv_layer].uv = (x_pos + scale, y_pos)                    
+            bm.faces[fa].loops[2][uv_layer].uv = (x_pos + scale, y_pos + scale)
+            bm.faces[fa].loops[3][uv_layer].uv = (x_pos, y_pos + scale) 
+            
+            x_pos += scale 
+            
+            if fa >= count:            
+                y_pos += scale
+                x_pos = 0.0
+                count += columns  
                     
     bm.to_mesh(mesh)              
 
@@ -266,22 +281,46 @@ class CubeSter(bpy.types.Operator):
         
         #uv unwrap?
         if scene.cubester_materials == "uv":
-            createUVMap(context, rows, int(len(faces) / 6 / rows))
+            if scene.cubester_blocks_plane == "blocks":
+                createUVMap(context, rows, int(len(faces) / 6 / rows))
+            else:
+                createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
         
         #material
         if scene.render.engine == "CYCLES":
-            if "CubeSter" in bpy.data.materials:
-                ob.data.materials.append(bpy.data.materials["CubeSter"])
+            
+            if scene.cubester_materials == "vertex":
+                if "CubeSter_Vertex" in bpy.data.materials:
+                    ob.data.materials.append(bpy.data.materials["CubeSter_Vertex"])
+                else:
+                    mat = bpy.data.materials.new("CubeSter_Vertex")
+                    mat.use_nodes = True
+                    nodes = mat.node_tree.nodes            
+                    att = nodes.new("ShaderNodeAttribute")
+                    att.attribute_name = "Col"
+                    att.location = (-200, 300)
+                    mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
+                    ob.data.materials.append(mat)
+                    
             else:
-                mat = bpy.data.materials.new("CubeSter")
-                mat.use_nodes = True
-                nodes = mat.node_tree.nodes            
-                att = nodes.new("ShaderNodeAttribute")
-                att.attribute_name = "Col"
-                att.location = (-200, 300)
-                mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
-                ob.data.materials.append(mat)
-
+                if ("CubeSter_" + scene.cubester_image)  in bpy.data.materials:
+                    ob.data.materials.append(bpy.data.materials["CubeSter_" + scene.cubester_image])
+                else:
+                    mat = bpy.data.materials.new("CubeSter_" + scene.cubester_image)
+                    mat.use_nodes = True
+                    nodes = mat.node_tree.nodes
+                    
+                    att = nodes.new("ShaderNodeTexImage")
+                    att.image = bpy.data.images[scene.cubester_image]
+                    att.location = (-200, 300)
+                    mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
+                    
+                    att = nodes.new("ShaderNodeTexCoord")
+                    att.location = (-450, 300)
+                    mat.node_tree.links.new(nodes["Texture Coordinate"].outputs[2], nodes["Image Texture"].inputs[0])
+                    
+                    ob.data.materials.append(mat)
+                      
         #vertex colors
         bpy.ops.mesh.vertex_color_add()        
         i = 0

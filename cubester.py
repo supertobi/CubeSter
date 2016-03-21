@@ -118,7 +118,7 @@ bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load 
 bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
 
 #material based stuff
-bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("uv", "UV Map", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
+bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("image", "Image", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
@@ -155,7 +155,7 @@ class CubeSterPanel(bpy.types.Panel):
         layout.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         #if using uvs for image, then give option to use different image for color
-        if scene.cubester_materials == "uv":
+        if scene.cubester_materials == "image":
             layout.separator()
             layout.prop(scene, "cubester_use_image_color", icon = "COLOR")
             
@@ -305,56 +305,53 @@ class CubeSter(bpy.types.Operator):
         bpy.context.scene.objects.active = ob        
         ob.select = True
         
-        #uv unwrap?
-        if scene.cubester_materials == "uv":
-            if scene.cubester_blocks_plane == "blocks":
-                createUVMap(context, rows, int(len(faces) / 6 / rows))
-            else:
-                createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
+        #uv unwrap
+        if scene.cubester_blocks_plane == "blocks":
+            createUVMap(context, rows, int(len(faces) / 6 / rows))
+        else:
+            createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
         
         #material
         if scene.render.engine == "CYCLES":
-            
-            if scene.cubester_materials == "vertex":
-                if "CubeSter_Vertex" in bpy.data.materials:
-                    ob.data.materials.append(bpy.data.materials["CubeSter_Vertex"])
-                else:
-                    mat = bpy.data.materials.new("CubeSter_Vertex")
-                    mat.use_nodes = True
-                    nodes = mat.node_tree.nodes            
-                    att = nodes.new("ShaderNodeAttribute")
-                    att.attribute_name = "Col"
-                    att.location = (-200, 300)
-                    mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
-                    ob.data.materials.append(mat)
-                    
+            #determine name and if already created
+            if scene.cubester_materials == "vertex": #vertex color
+                image_name = "Vertex"             
+            elif not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images and scene.cubester_materials == "image": #replaced image
+                image_name = scene.cubester_color_image
+            else: #normal image
+                image_name = scene.cubester_image
+             
+            #either add material or create   
+            if ("CubeSter_" + image_name)  in bpy.data.materials:
+                ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
+            #create material
             else:
-                #figure out what to name material
+                #add all nodes, only link ones specific
+                mat = bpy.data.materials.new("CubeSter_" + image_name)
+                mat.use_nodes = True
+                nodes = mat.node_tree.nodes 
+                           
+                att = nodes.new("ShaderNodeAttribute")
+                att.attribute_name = "Col"
+                att.location = (-200, 300)
+                
+                att = nodes.new("ShaderNodeTexImage")
                 if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
-                    image_name = scene.cubester_color_image
+                    att.image = bpy.data.images[scene.cubester_color_image]
                 else:
-                    image_name = scene.cubester_image
-                    
-                if ("CubeSter_" + image_name)  in bpy.data.materials:
-                    ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
-                else:
-                    mat = bpy.data.materials.new("CubeSter_" + image_name)
-                    mat.use_nodes = True
-                    nodes = mat.node_tree.nodes
-                    
-                    att = nodes.new("ShaderNodeTexImage")
-                    if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
-                        att.image = bpy.data.images[scene.cubester_color_image]
-                    else:
-                        att.image = bpy.data.images[scene.cubester_image]
-                    att.location = (-200, 300)
-                    mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
-                    
-                    att = nodes.new("ShaderNodeTexCoord")
-                    att.location = (-450, 300)
+                    att.image = bpy.data.images[scene.cubester_image]
+                att.location = (-200, 600)                
+                
+                att = nodes.new("ShaderNodeTexCoord")
+                att.location = (-450, 600)
+                
+                if scene.cubester_materials == "image":
+                    mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])                
                     mat.node_tree.links.new(nodes["Texture Coordinate"].outputs[2], nodes["Image Texture"].inputs[0])
-                    
-                    ob.data.materials.append(mat)
+                else:
+                    mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
+                
+                ob.data.materials.append(mat)                
                       
         #vertex colors
         bpy.ops.mesh.vertex_color_add()        

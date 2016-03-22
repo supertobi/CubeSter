@@ -123,7 +123,7 @@ bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Ima
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
 #advanced
-bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanved Options?")
+bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanced Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
 bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
 bpy.types.Scene.cubester_weight_g = FloatProperty(name = "Green", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)

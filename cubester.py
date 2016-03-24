@@ -188,6 +188,7 @@ bpy.types.Scene.cubester_image = StringProperty(default = "", name = "")
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
 bpy.types.Scene.cubester_skip_images = IntProperty(name = "Skip # Images", min = 0, max = 30, default = 0, description = "Skip this number of images before using one")
 bpy.types.Scene.cubester_max_images = IntProperty(name = "Max Number Of Images", min = 2, max = 100, default = 10, description = "Maximum number of images to be used")
+bpy.types.Scene.cubester_frame_step = IntProperty(name = "Frame Step Size", min = 1, max = 10, default = 4, description = "Basically the equivalent of FPS")
 #look adjustments
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
@@ -232,6 +233,7 @@ class CubeSterPanel(bpy.types.Panel):
                 layout.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
             layout.prop(scene, "cubester_max_images")
             layout.prop(scene, "cubester_skip_images")
+            layout.prop(scene, "cubester_frame_step")
                 
             layout.separator()
         
@@ -482,7 +484,7 @@ class CubeSter(bpy.types.Operator):
                 
                 frames.append(frame_heights)
             
-            print(str(len(frames)) + " Frames each with " + str(int(len(verts) / 8)) + " points in " + timeit.default_timer() - image_start)
+            print(str(len(frames)) + " frames each with " + str(int(len(verts) / 8)) + " points in " + str(timeit.default_timer() - image_start))
             
             #use data to animate mesh                    
             action = bpy.data.actions.new("CubeSterAnimation")
@@ -506,7 +508,7 @@ class CubeSter(bpy.types.Operator):
                         vals = [temp_v[0], temp_v[1], frame[frame_start_vert]]
                         for i in range(3):                                                            
                             fcurves[i].keyframe_points.insert(frame_counter, vals[i], {'FAST'})   
-                        frame_counter += 1   
+                        frame_counter += scene.cubester_frame_step   
                     
                     vert_index += 1
                 vert_index += 4

@@ -462,9 +462,9 @@ class CubeSter(bpy.types.Operator):
             #goes through and for each image for each block finds new height
             for image_index in range(0, max, scene.cubester_skip_images + 1):
                 filepath = images[0][image_index]
-                name = images[1][image_index]                
+                name = images[1][image_index]                                
                 picture = fetchImage(name, filepath)
-                pixels = picture.pixels
+                pixels = list(picture.pixels)
                 
                 frame_heights = []                
                 

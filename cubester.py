@@ -48,7 +48,19 @@ def adjustSelectedColorImage(self, context):
         image = bpy.data.images.load(scene.cubester_load_color_image)
         scene.cubester_color_image = image.name
     except:
-        print("CubeSter: " + scene.cubester_load_color_image + " could not be loaded")
+        print("CubeSter: " + scene.cubester_load_color_image + " could not be loaded")        
+        
+#if already loaded return image, else load and return
+def fetchImage(name, load_path):
+    if name in bpy.data.images:
+        return bpy.data.images[name]
+    else:
+        try:
+            image = bpy.data.images.load(load_path)
+            return image
+        except:
+            print("CubeSter: " + load_path + " could not be loaded")
+            return None            
 
 #crate block at center position x, y with block width 2*hx and 2*hy and height of h    
 def createBlock(x, y, hx, hy, h, verts, faces):
@@ -113,7 +125,7 @@ def createUVMap(context, rows, columns):
 #find all images that would belong to sequence
 def findSquenceImages(context):
     scene = context.scene
-    images = []
+    images = [[], []]
     
     if scene.cubester_image in bpy.data.images:
         image = bpy.data.images[scene.cubester_image]
@@ -132,10 +144,42 @@ def findSquenceImages(context):
         
         dir_name = os.path.dirname(path.abspath(image.filepath))
         for file in os.listdir(dir_name):
-            if os.path.isfile(os.path.join(dir_name, file)) and file.startswith(name) and file != main:
-                images.append(os.path.join(dir_name, file))
+            if os.path.isfile(os.path.join(dir_name, file)) and file.startswith(name):
+                images[0].append(os.path.join(dir_name, file))
+                images[1].append(file)
         
     return images
+
+#find height for point
+def findPointHeight(r, g, b, a, scene):        
+    if a != 0: #if not completely transparent                    
+        normalize = 1
+        
+        #channel weighting
+        if not scene.cubester_advanced:
+            composed = 0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a
+            total = 1
+        else:
+            #user defined weighting
+            if not scene.cubester_random_weights:
+                composed = scene.cubester_weight_r * r + scene.cubester_weight_g * g + scene.cubester_weight_b * b + scene.cubester_weight_a * a
+                total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
+                normalize = 1 / total
+            #random weighting
+            else:                           
+                composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a
+                total = weights[0] + weights[1] + weights[2] + weights[3] 
+                normalize = 1 / total  
+                
+        if scene.cubester_invert:
+            h = (1 - composed) * scene.cubester_height_scale * normalize
+        else:
+            h = composed * scene.cubester_height_scale * normalize
+    
+        return h
+    
+    else:
+        return -1
 
 #main properties
 #image
@@ -184,8 +228,8 @@ class CubeSterPanel(bpy.types.Panel):
         if scene.cubester_load_type == "multiple":
             #display number of images found there            
             images = findSquenceImages(context)
-            if len(images) > 0:
-                layout.label(str(len(images)) + " Images Found", icon = "PACKAGE")
+            if len(images[0]) > 0:
+                layout.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
             layout.prop(scene, "cubester_max_images")
             layout.prop(scene, "cubester_skip_images")
                 
@@ -303,30 +347,10 @@ class CubeSter(bpy.types.Operator):
                 b = pixs[2] 
                 a = pixs[3]
                 
-                if a != 0: #if not completely transparent                    
-                    normalize = 1
-                    
-                    #channel weighting
-                    if not scene.cubester_advanced:
-                        composed = 0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a
-                        total = 1
-                    else:
-                        #user defined weighting
-                        if not scene.cubester_random_weights:
-                            composed = scene.cubester_weight_r * r + scene.cubester_weight_g * g + scene.cubester_weight_b * b + scene.cubester_weight_a * a
-                            total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
-                            normalize = 1 / total
-                        #random weighting
-                        else:                           
-                            composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a
-                            total = weights[0] + weights[1] + weights[2] + weights[3] 
-                            normalize = 1 / total  
-                            
-                    if scene.cubester_invert:
-                        h = (1 - composed) * scene.cubester_height_scale * normalize
-                    else:
-                        h = composed * scene.cubester_height_scale * normalize
-                    
+                h = findPointHeight(r, g, b, a, scene)
+                
+                #if not transparent
+                if h != -1:                   
                     if scene.cubester_blocks_plane == "blocks":
                         createBlock(x, y, hx, hy, h, verts, faces)
                         vert_colors += [(r, g, b) for i in range(24)]
@@ -339,7 +363,7 @@ class CubeSter(bpy.types.Operator):
             
             #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
             if scene.cubester_blocks_plane == "plane":
-                del vert_colors[len(vert_colors) - 4:len(vert_colors)]
+                del vert_colors[len(vert_colors) - 4:len(vert_colors)]                        
             
         #create faces if plane based and not block based
         if scene.cubester_blocks_plane == "plane":
@@ -413,11 +437,79 @@ class CubeSter(bpy.types.Operator):
 
         stop = timeit.default_timer()
         
-        #print time data
+        #print time to generate mesh and handle materials
         if scene.cubester_blocks_plane == "blocks":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks in " + str(stop - start)) 
         else:
-            print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))                   
+            print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))   
+            
+        #image squence handling
+        if scene.cubester_load_type == "multiple":
+            image_start = timeit.default_timer() #########TIMER
+            
+            images = findSquenceImages(context)
+            
+            frames = []
+            
+            if len(images[0]) >= scene.cubester_max_images:
+                max = scene.cubester_max_images
+            else:
+                max = len(images[0])
+            max *= scene.cubester_skip_images + 1
+            
+            #goes through and for each image for each block finds new height
+            for image_index in range(0, max, scene.cubester_skip_images + 1):
+                filepath = images[0][image_index]
+                name = images[1][image_index]                
+                picture = fetchImage(name, filepath)
+                pixels = picture.pixels
+                
+                frame_heights = []                
+                
+                for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):        
+                    for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4): 
+                        i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
+                        pixs = pixels[i:i+4]       
+                        r = pixs[0]
+                        g = pixs[1]
+                        b = pixs[2] 
+                        a = pixs[3]
+                        
+                        h = findPointHeight(r, g, b, a, scene)
+                        
+                        if h != -1:
+                            frame_heights.append(h)
+                
+                frames.append(frame_heights)
+            
+            print(str(len(frames)) + " Frames each with " + str(int(len(verts) / 8)) + " points in " + timeit.default_timer() - image_start)
+            
+            #use data to animate mesh                    
+            action = bpy.data.actions.new("CubeSterAnimation")
+
+            mesh.animation_data_create()
+            mesh.animation_data.action = action
+
+            data_path = "vertices[%d].co"    
+            vert_index = 4                    
+            
+            #loop for every face height value
+            for frame_start_vert in range(len(frames[0])):                
+                #loop through to get the four vertices that compose the face                                
+                for frame_vert in range(frame_start_vert, frame_start_vert + 4):
+                    fcurves = [action.fcurves.new(data_path % vert_index, i) for i in range(3)]
+                    frame_counter = 1 
+                    temp_v = mesh.vertices[vert_index].co                 
+                    
+                    #loop through frames
+                    for frame in frames:
+                        vals = [temp_v[0], temp_v[1], frame[frame_start_vert]]
+                        for i in range(3):                                                            
+                            fcurves[i].keyframe_points.insert(frame_counter, vals[i], {'FAST'})   
+                        frame_counter += 1   
+                    
+                    vert_index += 1
+                vert_index += 4
         
         return {"FINISHED"}               
         

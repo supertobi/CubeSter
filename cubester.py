@@ -29,6 +29,8 @@ from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty, 
 import timeit 
 from random import uniform
 import bmesh
+import os
+from bpy import path
 
 #load image if possible
 def adjustSelectedImage(self, context):
@@ -106,17 +108,48 @@ def createUVMap(context, rows, columns):
                 x_pos = 0.0
                 count += columns  
                     
-    bm.to_mesh(mesh)              
+    bm.to_mesh(mesh) 
+    
+#find all images that would belong to sequence
+def findSquenceImages(context):
+    scene = context.scene
+    images = []
+    
+    if scene.cubester_image in bpy.data.images:
+        image = bpy.data.images[scene.cubester_image]
+        main = image.name.split(".")[0]
+        exstention = image.name.split(".")[1]
+        
+        #first part of name to check against other files
+        length = len(main)
+        keep_going = True
+        for i in range(len(main) - 1, -1, -1):
+            if main[i].isdigit() and keep_going:
+                length -= 1
+            else:
+                keep_going = not keep_going
+        name = main[0:length]
+        
+        dir_name = os.path.dirname(path.abspath(image.filepath))
+        for file in os.listdir(dir_name):
+            if os.path.isfile(os.path.join(dir_name, file)) and file.startswith(name) and file != main:
+                images.append(os.path.join(dir_name, file))
+        
+    return images
 
-#scene properties
+#main properties
+#image
+bpy.types.Scene.cubester_load_type = EnumProperty(name = "Input Type", items = (("single", "Single Image", ""), ("multiple", "Image Sequence", "")))
+bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
+bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
+bpy.types.Scene.cubester_skip_images = IntProperty(name = "Skip # Images", min = 0, max = 30, default = 0, description = "Skip this number of images before using one")
+bpy.types.Scene.cubester_max_images = IntProperty(name = "Max Number Of Images", min = 2, max = 100, default = 10, description = "Maximum number of images to be used")
+#look adjustments
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
 bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks/Points", subtype =  "DISTANCE", min = 0.001, max = 5, default = 1)
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
-bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
-bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
 bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
-
 #material based stuff
 bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("image", "Image", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
@@ -140,10 +173,23 @@ class CubeSterPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout 
         scene = bpy.context.scene
+        
+        layout.prop(scene, "cubester_load_type")        
         layout.label("Image To Convert:")
         layout.prop_search(scene, "cubester_image", bpy.data, "images")
         layout.prop(scene, "cubester_load_image")
         layout.separator()
+        
+        #find number of approriate images if sequence
+        if scene.cubester_load_type == "multiple":
+            #display number of images found there            
+            images = findSquenceImages(context)
+            if len(images) > 0:
+                layout.label(str(len(images)) + " Images Found", icon = "PACKAGE")
+            layout.prop(scene, "cubester_max_images")
+            layout.prop(scene, "cubester_skip_images")
+                
+            layout.separator()
         
         layout.prop(scene, "cubester_skip_pixels")
         layout.prop(scene, "cubester_size_per_hundred_pixels")
@@ -151,7 +197,7 @@ class CubeSterPanel(bpy.types.Panel):
         layout.prop(scene, "cubester_invert", icon = "FILE_REFRESH")                 
         
         layout.separator()
-        layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")
+        layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")        
         layout.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         #if using uvs for image, then give option to use different image for color

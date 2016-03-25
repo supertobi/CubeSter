@@ -143,10 +143,14 @@ def findSequenceImages(context):
         name = main[0:length]
         
         dir_name = os.path.dirname(path.abspath(image.filepath))
-        for file in os.listdir(dir_name):
-            if os.path.isfile(os.path.join(dir_name, file)) and file.startswith(name):
-                images[0].append(os.path.join(dir_name, file))
-                images[1].append(file)
+        
+        try:
+            for file in os.listdir(dir_name):
+                if os.path.isfile(os.path.join(dir_name, file)) and file.startswith(name):
+                    images[0].append(os.path.join(dir_name, file))
+                    images[1].append(file)
+        except:
+            print("CubeSter: " + dir_name + " dirctory not found")
         
     return images
 
@@ -190,7 +194,14 @@ def getPixelValues(picture, pixels, row, column):
     b = pixs[2] 
     a = pixs[3]
     
-    return r, g, b, a   
+    return r, g, b, a  
+
+#get image node
+def getImageNode(mat):
+    nodes = mat.node_tree.nodes
+    att = nodes["Image Texture"]
+    
+    return att     
 
 #frame change handler for materials
 def materialFrameHandler(scene):
@@ -202,19 +213,29 @@ def materialFrameHandler(scene):
         #if object is in scene then update information
         if i in bpy.data.objects:
             ob = bpy.data.objects[i]        
-            object = scene.cubester_vertex_colors[ob.name]
-            colors = object["frames"]
+            object = scene.cubester_vertex_colors[ob.name]            
             skip_frames = object["frame_skip"]
             max = object["total_images"]            
-                                   
-            if frame % skip_frames == 0 and frame < max * skip_frames:
-                use_frame = int(frame / skip_frames)
-                color = colors[use_frame]                                                
+            type = object["type"]    
+            
+            #update materials using vertex colors
+            if type == "vertex":
+                colors = object["frames"]
                 
-                i = 0
-                for c in ob.data.vertex_colors[0].data:
-                    c.color = color[i]
-                    i += 1
+                if frame % skip_frames == 0 and frame < max * skip_frames:
+                    use_frame = int(frame / skip_frames)
+                    color = colors[use_frame]                                                
+                    
+                    i = 0
+                    for c in ob.data.vertex_colors[0].data:
+                        c.color = color[i]
+                        i += 1
+                        
+            else:
+                att = getImageNode(ob.data.materials[0])
+                offset = frame - int(frame / skip_frames)             
+                att.image_user.frame_offset = -offset
+                
         #if the object is no longer in the scene then delete then entry
         else:
             del scene.cubester_vertex_colors[i]
@@ -456,7 +477,10 @@ class CubeSter(bpy.types.Operator):
                     att.image = bpy.data.images[scene.cubester_color_image]
                 else:
                     att.image = bpy.data.images[scene.cubester_image]
-                att.location = (-200, 600)                
+                
+                if scene.cubester_load_type == "multiple":
+                    att.image.source = "SEQUENCE"
+                att.location = (-200, 700)                
                 
                 att = nodes.new("ShaderNodeTexCoord")
                 att.location = (-450, 600)
@@ -526,8 +550,16 @@ class CubeSter(bpy.types.Operator):
                                             
                 frames.append(frame_heights)
                 frames_vert_colors.append(frame_colors)
-                
-            scene.cubester_vertex_colors[ob.name] = {"frames" : frames_vert_colors, "frame_skip" : scene.cubester_frame_step, "total_images" : max}
+            
+            #determine what data to use
+            if scene.cubester_materials == "vertex":    
+                scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
+                        "frame_skip" : scene.cubester_frame_step, "total_images" : max}
+            else:
+                scene.cubester_vertex_colors[ob.name] = {"type" : "image", "frame_skip" : scene.cubester_frame_step,
+                        "total_images" : max} 
+                att = getImageNode(ob.data.materials[0])
+                att.image_user.frame_duration = len(frames) * scene.cubester_frame_step                           
             
             print(str(len(frames)) + " frames each with " + str(int(len(verts) / 8)) + " points in " + str(timeit.default_timer() - image_start))
             

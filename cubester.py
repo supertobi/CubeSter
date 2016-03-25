@@ -230,54 +230,60 @@ class CubeSterPanel(bpy.types.Panel):
         layout = self.layout 
         scene = bpy.context.scene
         
-        layout.prop(scene, "cubester_load_type")        
-        layout.label("Image To Convert:")
-        layout.prop_search(scene, "cubester_image", bpy.data, "images")
-        layout.prop(scene, "cubester_load_image")
+        box = layout.box()
+        box.prop(scene, "cubester_load_type")        
+        box.label("Image To Convert:")
+        box.prop_search(scene, "cubester_image", bpy.data, "images")
+        box.prop(scene, "cubester_load_image")
         layout.separator()
         
         #find number of approriate images if sequence
         if scene.cubester_load_type == "multiple":
+            box = layout.box()
             #display number of images found there            
             images = findSequenceImages(context)
             if len(images[0]) > 0:
-                layout.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
-            layout.prop(scene, "cubester_max_images")
-            layout.prop(scene, "cubester_skip_images")
-            layout.prop(scene, "cubester_frame_step")
+                box.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
+            box.prop(scene, "cubester_max_images")
+            box.prop(scene, "cubester_skip_images")
+            box.prop(scene, "cubester_frame_step")
                 
             layout.separator()
         
-        layout.prop(scene, "cubester_skip_pixels")
-        layout.prop(scene, "cubester_size_per_hundred_pixels")
-        layout.prop(scene, "cubester_height_scale")
-        layout.prop(scene, "cubester_invert", icon = "FILE_REFRESH")                 
+        box = layout.box()
+        box.prop(scene, "cubester_skip_pixels")
+        box.prop(scene, "cubester_size_per_hundred_pixels")
+        box.prop(scene, "cubester_height_scale")
+        box.prop(scene, "cubester_invert", icon = "FILE_REFRESH")                 
         
         layout.separator()
-        layout.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")        
-        layout.prop(scene, "cubester_materials", icon = "MATERIAL")
+        box = layout.box()
+        box.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")        
+        box.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         #if using uvs for image, then give option to use different image for color
         if scene.cubester_materials == "image":
-            layout.separator()
-            layout.prop(scene, "cubester_use_image_color", icon = "COLOR")
+            box.separator()
+            box.prop(scene, "cubester_use_image_color", icon = "COLOR")
             
             if not scene.cubester_use_image_color:
-                layout.label("Image To Use For Colors:")
-                layout.prop_search(scene, "cubester_color_image", bpy.data, "images")
-                layout.prop(scene, "cubester_load_color_image")   
+                box.label("Image To Use For Colors:")
+                box.prop_search(scene, "cubester_color_image", bpy.data, "images")
+                box.prop(scene, "cubester_load_color_image")   
         
         layout.separator()
         layout.operator("mesh.cubester", icon = "OBJECT_DATA")       
         
         if scene.cubester_image in bpy.data.images:
+            layout.separator()
+            box = layout.box()
             rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
             columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))
             
             if scene.cubester_mesh_style == "blocks":           
-                layout.label("Approximate Cube Count: " + str(rows * columns))
+                box.label("Approximate Cube Count: " + str(rows * columns))
             else:
-                layout.label("Approximate Point Count: " + str(rows * columns))
+                box.label("Approximate Point Count: " + str(rows * columns))
             
             #blocks and plane time values
             if scene.cubester_mesh_style == "blocks":
@@ -294,23 +300,23 @@ class CubeSterPanel(bpy.types.Panel):
                 time /= 60
                 time_mod = "min"
             time = round(time, 3)
-            layout.label("Expected Time: " + str(time) + " " + time_mod)
+            box.label("Expected Time: " + str(time) + " " + time_mod)
             
             #expected vert/face count
             if scene.cubester_mesh_style == "blocks":           
-                layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
+                box.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
             else:
-                layout.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
+                box.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
             
         #advanced
         layout.separator()
-        layout.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
+        box = layout.box()
+        box.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
         if bpy.context.scene.cubester_advanced:
-            layout.prop(scene, "cubester_random_weights", icon = "RNDCURVE")
-            layout.separator()
+            box.prop(scene, "cubester_random_weights", icon = "RNDCURVE")
+            box.separator()
             
-            if not bpy.context.scene.cubester_random_weights:
-                box = layout.box()
+            if not bpy.context.scene.cubester_random_weights:                
                 box.label("RGBA Channel Weights", icon = "COLOR")
                 box.prop(scene, "cubester_weight_r")
                 box.prop(scene, "cubester_weight_g")

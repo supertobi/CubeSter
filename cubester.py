@@ -196,8 +196,12 @@ def getPixelValues(picture, pixels, row, column):
 def materialFrameHandler(scene):
     frame = scene.frame_current
     
-    for ob in bpy.data.objects:
-        if ob.type == "MESH" and ob.name in scene.cubester_vertex_colors:
+    keys = list(scene.cubester_vertex_colors.keys())
+    #get keys and see if object is still in scene
+    for i in keys: 
+        #if object is in scene then update information
+        if i in bpy.data.objects:
+            ob = bpy.data.objects[i]        
             object = scene.cubester_vertex_colors[ob.name]
             colors = object["frames"]
             skip_frames = object["frame_skip"]
@@ -211,6 +215,9 @@ def materialFrameHandler(scene):
                 for c in ob.data.vertex_colors[0].data:
                     c.color = color[i]
                     i += 1
+        #if the object is no longer in the scene then delete then entry
+        else:
+            del scene.cubester_vertex_colors[i]
 
 #main properties
 #image

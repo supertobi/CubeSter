@@ -89,7 +89,7 @@ def createUVMap(context, rows, columns):
     count = columns - 1 #hold current count to compare to if need to go to next row
     
     #if blocks
-    if context.scene.cubester_blocks_plane == "blocks":              
+    if context.scene.cubester_mesh_style == "blocks":              
         for fa in range(int(len(bm.faces) / 6)):        
             for i in range(6):
                 pos = (fa * 6) + i
@@ -180,6 +180,17 @@ def findPointHeight(r, g, b, a, scene):
     
     else:
         return -1
+    
+#get the RGBA values from pixel
+def getPixelValues(picture, pixels, row, column):
+    i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
+    pixs = pixels[i:i+4]       
+    r = pixs[0]
+    g = pixs[1]
+    b = pixs[2] 
+    a = pixs[3]
+    
+    return r, g, b, a    
 
 #main properties
 #image
@@ -194,7 +205,7 @@ bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default 
 bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min = 0, max = 256, default = 64, description = "Skip this number of pixels before placing the next")
 bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks/Points", subtype =  "DISTANCE", min = 0.001, max = 5, default = 1)
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
-bpy.types.Scene.cubester_blocks_plane = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
+bpy.types.Scene.cubester_mesh_style = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
 #material based stuff
 bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("image", "Image", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
@@ -243,7 +254,7 @@ class CubeSterPanel(bpy.types.Panel):
         layout.prop(scene, "cubester_invert", icon = "FILE_REFRESH")                 
         
         layout.separator()
-        layout.prop(scene, "cubester_blocks_plane", icon = "MESH_GRID")        
+        layout.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")        
         layout.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         #if using uvs for image, then give option to use different image for color
@@ -263,13 +274,13 @@ class CubeSterPanel(bpy.types.Panel):
             rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
             columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))
             
-            if scene.cubester_blocks_plane == "blocks":           
+            if scene.cubester_mesh_style == "blocks":           
                 layout.label("Approximate Cube Count: " + str(rows * columns))
             else:
                 layout.label("Approximate Point Count: " + str(rows * columns))
             
             #blocks and plane time values
-            if scene.cubester_blocks_plane == "blocks":
+            if scene.cubester_mesh_style == "blocks":
                 slope = 0.0000876958
                 intercept = 0.02501
             else:
@@ -286,7 +297,7 @@ class CubeSterPanel(bpy.types.Panel):
             layout.label("Expected Time: " + str(time) + " " + time_mod)
             
             #expected vert/face count
-            if scene.cubester_blocks_plane == "blocks":           
+            if scene.cubester_mesh_style == "blocks":           
                 layout.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
             else:
                 layout.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
@@ -341,19 +352,13 @@ class CubeSter(bpy.types.Operator):
             rows += 1          
             x = -width / 2 + step_x / 2 #reset to left edge of mesh
             #go through each column, step by appropriate amount
-            for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):        
-                i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
-                pixs = pixels[i:i+4]       
-                r = pixs[0]
-                g = pixs[1]
-                b = pixs[2] 
-                a = pixs[3]
-                
+            for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):                        
+                r, g, b, a = getPixelValues(picture, pixels, row, column)
                 h = findPointHeight(r, g, b, a, scene)
                 
                 #if not transparent
                 if h != -1:                   
-                    if scene.cubester_blocks_plane == "blocks":
+                    if scene.cubester_mesh_style == "blocks":
                         createBlock(x, y, hx, hy, h, verts, faces)
                         vert_colors += [(r, g, b) for i in range(24)]
                     else:                            
@@ -364,11 +369,11 @@ class CubeSter(bpy.types.Operator):
             y += step_y
             
             #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
-            if scene.cubester_blocks_plane == "plane":
+            if scene.cubester_mesh_style == "plane":
                 del vert_colors[len(vert_colors) - 4:len(vert_colors)]                        
             
         #create faces if plane based and not block based
-        if scene.cubester_blocks_plane == "plane":
+        if scene.cubester_mesh_style == "plane":
             off = int(len(verts) / rows)
             for r in range(rows - 1):
                 for c in range(off - 1):
@@ -382,7 +387,7 @@ class CubeSter(bpy.types.Operator):
         ob.select = True
         
         #uv unwrap
-        if scene.cubester_blocks_plane == "blocks":
+        if scene.cubester_mesh_style == "blocks":
             createUVMap(context, rows, int(len(faces) / 6 / rows))
         else:
             createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
@@ -440,7 +445,7 @@ class CubeSter(bpy.types.Operator):
         stop = timeit.default_timer()
         
         #print time to generate mesh and handle materials
-        if scene.cubester_blocks_plane == "blocks":
+        if scene.cubester_mesh_style == "blocks":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks in " + str(stop - start)) 
         else:
             print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))   
@@ -470,13 +475,7 @@ class CubeSter(bpy.types.Operator):
                 
                 for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):        
                     for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4): 
-                        i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
-                        pixs = pixels[i:i+4]       
-                        r = pixs[0]
-                        g = pixs[1]
-                        b = pixs[2] 
-                        a = pixs[3]
-                        
+                        r, g, b, a = getPixelValues(picture, pixels, row, column)                        
                         h = findPointHeight(r, g, b, a, scene)
                         
                         if h != -1:
@@ -492,26 +491,40 @@ class CubeSter(bpy.types.Operator):
             mesh.animation_data_create()
             mesh.animation_data.action = action
 
-            data_path = "vertices[%d].co"    
-            vert_index = 4                    
+            data_path = "vertices[%d].co" 
             
-            #loop for every face height value
-            for frame_start_vert in range(len(frames[0])):                
+            if scene.cubester_mesh_style == "blocks":   
+                vert_index = 4 #index of first vert
+            else:
+                vert_index = 0                  
+            
+            #loop for every face height value            
+            for frame_start_vert in range(len(frames[0])): 
+                #only go once if plane, otherwise do all four vertices that are in top plane if blocks   
+                if scene.cubester_mesh_style == "blocks":   
+                    end_point = frame_start_vert + 4
+                else:
+                    end_point = frame_start_vert + 1
+                    
                 #loop through to get the four vertices that compose the face                                
-                for frame_vert in range(frame_start_vert, frame_start_vert + 4):
-                    fcurves = [action.fcurves.new(data_path % vert_index, i) for i in range(3)]
-                    frame_counter = 1 
+                for frame_vert in range(frame_start_vert, end_point):
+                    fcurves = [action.fcurves.new(data_path % vert_index, i) for i in range(3)] #fcurves for x, y, z
+                    frame_counter = 1 #go through each frame and add position                   
                     temp_v = mesh.vertices[vert_index].co                 
                     
                     #loop through frames
                     for frame in frames:
-                        vals = [temp_v[0], temp_v[1], frame[frame_start_vert]]
-                        for i in range(3):                                                            
+                        vals = [temp_v[0], temp_v[1], frame[frame_start_vert]] #new x, y, z positions
+                        for i in range(3): #for each x, y, z set each corresponding fcurve                                                        
                             fcurves[i].keyframe_points.insert(frame_counter, vals[i], {'FAST'})   
-                        frame_counter += scene.cubester_frame_step   
+                        
+                        frame_counter += scene.cubester_frame_step #skip frames for smoother animation   
                     
                     vert_index += 1
-                vert_index += 4
+                    
+                #only skip vertices if made of blocks
+                if scene.cubester_mesh_style == "blocks":
+                    vert_index += 4
         
         return {"FINISHED"}               
         

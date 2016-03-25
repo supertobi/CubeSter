@@ -222,7 +222,7 @@ def materialFrameHandler(scene):
             if type == "vertex":
                 colors = object["frames"]
                 
-                if frame % skip_frames == 0 and frame < max * skip_frames:
+                if frame % skip_frames == 0 and frame < (max - 1) * skip_frames and frame >= 0:
                     use_frame = int(frame / skip_frames)
                     color = colors[use_frame]                                                
                     
@@ -245,8 +245,8 @@ def materialFrameHandler(scene):
 bpy.types.Scene.cubester_load_type = EnumProperty(name = "Input Type", items = (("single", "Single Image", ""), ("multiple", "Image Sequence", "")))
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
-bpy.types.Scene.cubester_skip_images = IntProperty(name = "Skip # Images", min = 0, max = 30, default = 0, description = "Skip this number of images before using one")
-bpy.types.Scene.cubester_max_images = IntProperty(name = "Max Number Of Images", min = 2, max = 100, default = 10, description = "Maximum number of images to be used")
+bpy.types.Scene.cubester_skip_images = IntProperty(name = "Image Step", min = 1, max = 30, default = 1, description = "Step from image to image by this number")
+bpy.types.Scene.cubester_max_images = IntProperty(name = "Max Number Of Images", min = 2, max = 1000, default = 10, description = "Maximum number of images to be used")
 bpy.types.Scene.cubester_frame_step = IntProperty(name = "Frame Step Size", min = 1, max = 10, default = 4, description = "The number of frames each picture is used")
 #look adjustments
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
@@ -352,7 +352,7 @@ class CubeSterPanel(bpy.types.Panel):
                 time = rows * columns * slope + intercept #approximate time count for mesh
             else:
                 points = rows * columns
-                time = points * slope + intercept + points * image_mesh_slope + images_found * image_count_slope
+                time = (points * slope) + intercept + (points * image_mesh_slope )+ ((images_found / (scene.cubester_skip_images + 1)) * image_count_slope)
                 
             time_mod = "s"
             if time > 60: #convert to minutes if needed
@@ -520,14 +520,13 @@ class CubeSter(bpy.types.Operator):
                         
             frames_vert_colors = []
             
-            if len(images[0]) >= scene.cubester_max_images:
-                max = scene.cubester_max_images
+            if len(images[0]) > scene.cubester_max_images:
+                max = scene.cubester_max_images + 1
             else:
-                max = len(images[0])
-            max *= scene.cubester_skip_images + 1
+                max = len(images[0])            
             
             #goes through and for each image for each block finds new height
-            for image_index in range(0, max, scene.cubester_skip_images + 1):
+            for image_index in range(0, max, scene.cubester_skip_images):
                 filepath = images[0][image_index]
                 name = images[1][image_index]                                
                 picture = fetchImage(name, filepath)
@@ -542,6 +541,7 @@ class CubeSter(bpy.types.Operator):
                         h = findPointHeight(r, g, b, a, scene)
                         
                         if h != -1:
+                            
                             frame_heights.append(h)
                             if scene.cubester_mesh_style == "blocks":
                                 frame_colors += [(r, g, b) for i in range(24)]
@@ -553,9 +553,9 @@ class CubeSter(bpy.types.Operator):
                                             
                 frames.append(frame_heights)
                 frames_vert_colors.append(frame_colors)
-            
+
             #determine what data to use
-            if scene.cubester_materials == "vertex":    
+            if scene.cubester_materials == "vertex":  
                 scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
                         "frame_skip" : scene.cubester_frame_step, "total_images" : max}
             else:
@@ -588,7 +588,7 @@ class CubeSter(bpy.types.Operator):
                 #loop through to get the four vertices that compose the face                                
                 for frame_vert in range(frame_start_vert, end_point):
                     fcurves = [action.fcurves.new(data_path % vert_index, i) for i in range(3)] #fcurves for x, y, z
-                    frame_counter = 1 #go through each frame and add position                   
+                    frame_counter = 0 #go through each frame and add position                   
                     temp_v = mesh.vertices[vert_index].co                 
                     
                     #loop through frames
@@ -598,7 +598,7 @@ class CubeSter(bpy.types.Operator):
                             fcurves[i].keyframe_points.insert(frame_counter, vals[i], {'FAST'})   
                         
                         frame_counter += scene.cubester_frame_step #skip frames for smoother animation   
-                    
+                        
                     vert_index += 1
                     
                 #only skip vertices if made of blocks

@@ -278,6 +278,7 @@ class CubeSterPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout.box() 
         scene = bpy.context.scene
+        images_found = 0
         
         box = layout.box()
         box.prop(scene, "cubester_load_type")        
@@ -291,6 +292,7 @@ class CubeSterPanel(bpy.types.Panel):
             box = layout.box()
             #display number of images found there            
             images = findSequenceImages(context)
+            images_found = len(images[0]) if len(images[0]) <= scene.cubester_max_images else scene.cubester_max_images
             if len(images[0]) > 0:
                 box.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
             box.prop(scene, "cubester_max_images")
@@ -334,15 +336,23 @@ class CubeSterPanel(bpy.types.Panel):
             else:
                 box.label("Approximate Point Count: " + str(rows * columns))
             
-            #blocks and plane time values
+            #blocks and plane generation time values
             if scene.cubester_mesh_style == "blocks":
                 slope = 0.0000876958
                 intercept = 0.02501
+                image_count_slope = 0.38507396 #time added based on frames
+                image_mesh_slope = 0.002164 #time added based block count and frames
             else:
                 slope = 0.000017753
                 intercept = 0.04201
+                image_count_slope = 0.333098622 #time added based on frames
+                image_mesh_slope = 0.000176 #time added based block count and frames
             
-            time = rows * columns * slope + intercept #approximate time count for mesh
+            if scene.cubester_load_type == "single":
+                time = rows * columns * slope + intercept #approximate time count for mesh
+            else:
+                points = rows * columns
+                time = points * slope + intercept + points * image_mesh_slope + images_found * image_count_slope
                 
             time_mod = "s"
             if time > 60: #convert to minutes if needed
@@ -378,6 +388,8 @@ class CubeSter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}  
     
     def execute(self, context): 
+        start = timeit.default_timer() 
+        
         scene = bpy.context.scene
         picture = bpy.data.images[scene.cubester_image]
         pixels = list(picture.pixels)
@@ -397,8 +409,7 @@ class CubeSter(bpy.types.Operator):
 
         verts, faces = [], []
         vert_colors = []
-
-        start = timeit.default_timer()  
+         
         weights = [uniform(0.0, 1.0) for i in range(4)] #random weights  
         rows = 0             
 
@@ -498,23 +509,15 @@ class CubeSter(bpy.types.Operator):
         i = 0
         for c in ob.data.vertex_colors[0].data:
             c.color = vert_colors[i]
-            i += 1
-
-        stop = timeit.default_timer()
+            i += 1        
         
-        #print time to generate mesh and handle materials
-        if scene.cubester_mesh_style == "blocks":
-            print("CubeSter: " + str(int(len(verts) / 8)) + " blocks in " + str(stop - start)) 
-        else:
-            print("CubeSter: " + str(len(verts)) + " points in " + str(stop - start))   
-            
+        frames = []        
         #image squence handling
-        if scene.cubester_load_type == "multiple":
-            image_start = timeit.default_timer() #########TIMER
+        if scene.cubester_load_type == "multiple":            
+            start = timeit.default_timer()  
             
             images = findSequenceImages(context)
-            
-            frames = []
+                        
             frames_vert_colors = []
             
             if len(images[0]) >= scene.cubester_max_images:
@@ -559,9 +562,7 @@ class CubeSter(bpy.types.Operator):
                 scene.cubester_vertex_colors[ob.name] = {"type" : "image", "frame_skip" : scene.cubester_frame_step,
                         "total_images" : max} 
                 att = getImageNode(ob.data.materials[0])
-                att.image_user.frame_duration = len(frames) * scene.cubester_frame_step                           
-            
-            print(str(len(frames)) + " frames each with " + str(int(len(verts) / 8)) + " points in " + str(timeit.default_timer() - image_start))
+                att.image_user.frame_duration = len(frames) * scene.cubester_frame_step                                       
             
             #use data to animate mesh                    
             action = bpy.data.actions.new("CubeSterAnimation")
@@ -603,6 +604,20 @@ class CubeSter(bpy.types.Operator):
                 #only skip vertices if made of blocks
                 if scene.cubester_mesh_style == "blocks":
                     vert_index += 4
+        
+        
+        stop = timeit.default_timer()
+        
+        #print time to generate mesh and handle materials
+        if len(frames) == 0:
+            created = 1
+        else:
+            created = len(frames)
+            
+        if scene.cubester_mesh_style == "blocks":
+            print("CubeSter: " + str(int(len(verts) / 8)) + " blocks and " + str(created) + " frames in " + str(stop - start)) 
+        else:
+            print("CubeSter: " + str(len(verts)) + " points and " + str(created) + " frames in "+ str(stop - start))  
         
         return {"FINISHED"}               
         

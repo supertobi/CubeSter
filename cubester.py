@@ -190,7 +190,27 @@ def getPixelValues(picture, pixels, row, column):
     b = pixs[2] 
     a = pixs[3]
     
-    return r, g, b, a    
+    return r, g, b, a   
+
+#frame change handler for materials
+def materialFrameHandler(scene):
+    frame = scene.frame_current
+    
+    for ob in bpy.data.objects:
+        if ob.type == "MESH" and ob.name in scene.cubester_vertex_colors:
+            object = scene.cubester_vertex_colors[ob.name]
+            colors = object["frames"]
+            skip_frames = object["frame_skip"]
+            max = object["total_images"]            
+                                   
+            if frame % skip_frames == 0 and frame < max * skip_frames:
+                use_frame = int(frame / skip_frames)
+                color = colors[use_frame]                                                
+                
+                i = 0
+                for c in ob.data.vertex_colors[0].data:
+                    c.color = color[i]
+                    i += 1
 
 #main properties
 #image
@@ -211,6 +231,7 @@ bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
+bpy.types.Scene.cubester_vertex_colors = {}
 #advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanced Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
@@ -227,7 +248,7 @@ class CubeSterPanel(bpy.types.Panel):
     bl_category = "Tools"      
     
     def draw(self, context):
-        layout = self.layout 
+        layout = self.layout.box() 
         scene = bpy.context.scene
         
         box = layout.box()
@@ -463,6 +484,7 @@ class CubeSter(bpy.types.Operator):
             images = findSequenceImages(context)
             
             frames = []
+            frames_vert_colors = []
             
             if len(images[0]) >= scene.cubester_max_images:
                 max = scene.cubester_max_images
@@ -477,7 +499,8 @@ class CubeSter(bpy.types.Operator):
                 picture = fetchImage(name, filepath)
                 pixels = list(picture.pixels)
                 
-                frame_heights = []                
+                frame_heights = []
+                frame_colors = []               
                 
                 for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1):        
                     for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4): 
@@ -486,8 +509,18 @@ class CubeSter(bpy.types.Operator):
                         
                         if h != -1:
                             frame_heights.append(h)
-                
+                            if scene.cubester_mesh_style == "blocks":
+                                frame_colors += [(r, g, b) for i in range(24)]
+                            else:                                                            
+                                frame_colors += [(r, g, b) for i in range(4)]
+                            
+                if scene.cubester_mesh_style == "plane":
+                    del vert_colors[len(vert_colors) - 4:len(vert_colors)]   
+                                            
                 frames.append(frame_heights)
+                frames_vert_colors.append(frame_colors)
+                
+            scene.cubester_vertex_colors[ob.name] = {"frames" : frames_vert_colors, "frame_skip" : scene.cubester_frame_step, "total_images" : max}
             
             print(str(len(frames)) + " frames each with " + str(int(len(verts) / 8)) + " points in " + str(timeit.default_timer() - image_start))
             
@@ -536,9 +569,12 @@ class CubeSter(bpy.types.Operator):
         
 def register():
     bpy.utils.register_module(__name__)   
+    bpy.app.handlers.frame_change_pre.append(materialFrameHandler)
     
 def unregister():
     bpy.utils.unregister_module(__name__)
+    f_change = bpy.app.handlers.frame_change_pre
+    del f_change[0:len(f_change)]
     
 if __name__ == "__main__":
     register() 

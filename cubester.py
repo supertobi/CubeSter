@@ -17,8 +17,8 @@
 bl_info = {
     "name" : "CubeSter",
     "author" : "Jacob Morris",
-    "version" : (0, 4),
-    "blender" : (2, 76, 0),
+    "version" : (0, 5),
+    "blender" : (2, 77, 0),
     "location" : "View 3D > Toolbar > CubeSter",
     "description" : "Takes image or image sequence and converts it into a height map based on pixel color and alpha values",
     "category" : "Add Mesh"
@@ -63,10 +63,16 @@ def fetchImage(name, load_path):
             return None            
 
 #crate block at center position x, y with block width 2*hx and 2*hy and height of h    
-def createBlock(x, y, hx, hy, h, verts, faces):
+def createBlock(x, y, hw, h, verts, faces):    
+    if bpy.context.scene.cubester_block_style == "size":
+        z = 0.0
+    else:
+        z = h        
+        h = 2 * hw
+          
     p = len(verts)              
-    verts += [(x - hx, y - hy, 0.0), (x + hx, y - hy, 0.0), (x + hx, y + hy, 0.0), (x - hx, y + hy, 0.0)]  
-    verts += [(x - hx, y - hy, h), (x + hx, y - hy, h), (x + hx, y + hy, h), (x - hx, y + hy, h)]  
+    verts += [(x - hw, y - hw, z), (x + hw, y - hw, z), (x + hw, y + hw, z), (x - hw, y + hw, z)]  
+    verts += [(x - hw, y - hw, z + h), (x + hw, y - hw, z + h), (x + hw, y + hw, z + h), (x - hw, y + hw, z + h)]  
     
     faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
         (p, p+3, p+2, p+1)]
@@ -254,6 +260,7 @@ bpy.types.Scene.cubester_skip_pixels = IntProperty(name = "Skip # Pixels", min =
 bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks/Points", subtype =  "DISTANCE", min = 0.001, max = 5, default = 1)
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
 bpy.types.Scene.cubester_mesh_style = EnumProperty(name = "Mesh Type", items = (("blocks", "Blocks", ""), ("plane", "Plane", "")), description = "Compose mesh of multiple blocks or of a single plane")
+bpy.types.Scene.cubester_block_style = EnumProperty(name = "Block Style", items = (("size", "Vary Size", ""), ("position", "Vary Position", "")), description = "Vary Z-size of block, or vary Z-position")
 #material based stuff
 bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("image", "Image", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
@@ -309,7 +316,12 @@ class CubeSterPanel(bpy.types.Panel):
         
         layout.separator()
         box = layout.box()
-        box.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")        
+        box.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")
+        
+        if scene.cubester_mesh_style == "blocks":            
+            box.prop(scene, "cubester_block_style") 
+            box.separator()
+            
         box.prop(scene, "cubester_materials", icon = "MATERIAL")
         
         #if using uvs for image, then give option to use different image for color
@@ -320,10 +332,7 @@ class CubeSterPanel(bpy.types.Panel):
             if not scene.cubester_use_image_color:
                 box.label("Image To Use For Colors:")
                 box.prop_search(scene, "cubester_color_image", bpy.data, "images")
-                box.prop(scene, "cubester_load_color_image")   
-        
-        layout.separator()
-        layout.operator("mesh.cubester", icon = "OBJECT_DATA")       
+                box.prop(scene, "cubester_load_color_image")                         
         
         if scene.cubester_image in bpy.data.images:
             layout.separator()
@@ -381,6 +390,10 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop(scene, "cubester_weight_g")
                 box.prop(scene, "cubester_weight_b")
                 box.prop(scene, "cubester_weight_a")
+        
+        #generate mesh        
+        layout.separator()
+        layout.operator("mesh.cubester", icon = "OBJECT_DATA") 
     
 class CubeSter(bpy.types.Operator):
     bl_idname = "mesh.cubester"
@@ -400,12 +413,10 @@ class CubeSter(bpy.types.Operator):
         width = x_pixels / 100 * scene.cubester_size_per_hundred_pixels
         height = y_pixels / 100 * scene.cubester_size_per_hundred_pixels
 
-        step_x = width / x_pixels
-        step_y = height / y_pixels
-        hx = step_x / 2
-        hy = step_y / 2
+        step = width / x_pixels
+        half_width = step / 2
 
-        y = -height / 2 + step_y / 2
+        y = -height / 2 + half_width
 
         verts, faces = [], []
         vert_colors = []
@@ -416,7 +427,7 @@ class CubeSter(bpy.types.Operator):
         #go through each row of pixels stepping by scene.cubester_skip_pixels + 1
         for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1): 
             rows += 1          
-            x = -width / 2 + step_x / 2 #reset to left edge of mesh
+            x = -width / 2 + half_width #reset to left edge of mesh
             #go through each column, step by appropriate amount
             for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):                        
                 r, g, b, a = getPixelValues(picture, pixels, row, column)
@@ -425,14 +436,14 @@ class CubeSter(bpy.types.Operator):
                 #if not transparent
                 if h != -1:                   
                     if scene.cubester_mesh_style == "blocks":
-                        createBlock(x, y, hx, hy, h, verts, faces)
+                        createBlock(x, y, half_width, h, verts, faces)
                         vert_colors += [(r, g, b) for i in range(24)]
                     else:                            
                         verts += [(x, y, h)]                                 
                         vert_colors += [(r, g, b) for i in range(4)]
                         
-                x += step_x                
-            y += step_y
+                x += step               
+            y += step
             
             #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
             if scene.cubester_mesh_style == "plane":

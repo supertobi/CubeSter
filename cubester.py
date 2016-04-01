@@ -31,8 +31,6 @@ from random import uniform
 import bmesh
 import os
 from bpy import path
-import wave
-import numpy as np
 
 #load image if possible
 def adjustSelectedImage(self, context):
@@ -597,6 +595,9 @@ def materialFrameHandler(scene):
             
 #wave audio data
 def WAVAudioFileData(scene):
+    import wave
+    import numpy as np
+
     frame_rate = 24
     num_columns = scene.cubester_audio_length_blocks
     num_rows = scene.cubester_audio_width_blocks

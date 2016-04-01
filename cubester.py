@@ -31,6 +31,8 @@ from random import uniform
 import bmesh
 import os
 from bpy import path
+import wave
+import numpy as np
 
 #load image if possible
 def adjustSelectedImage(self, context):
@@ -154,7 +156,7 @@ def createMeshFromAudio(scene, verts, faces):
     for r in range(width):        
         x = -(length / 2) * size
         for c in range(length):
-            createBlock(x, y, size, 1, verts, faces)
+            createBlock(x, y, size / 2, 1, verts, faces)
             
             x += size            
         y += size
@@ -168,64 +170,105 @@ def createMeshFromAudio(scene, verts, faces):
     ob.select = True
     
     #set keyframe for each object as inital point
-    frame = [1 for i in range(int(len(verts) / 8))]
-    frames = [frame]
-    
-    area = bpy.context.area
-    old_type = area.type
-    area.type = "GRAPH_EDITOR"                    
-    
-    scene.frame_current = 0
-    
-    createFCurves(mesh, frames, 1, "blocks")
-    
-    #deselct all fcurves
-    fcurves = ob.data.animation_data.action.fcurves.data.fcurves
-    for i in fcurves:
-        i.select = False
+    if scene.cubester_audio_feature_set == "default":
+        frame = [1 for i in range(int(len(verts) / 8))]
+        frames = [frame]
         
-    max = scene.cubester_audio_max_freq
-    min = scene.cubester_audio_min_freq
-    freq_frame = scene.cubester_audio_offset_type
-    
-    if freq_frame == "freq":
-        off = scene.cubester_audio_freq_offset
+        area = bpy.context.area
+        old_type = area.type
+        area.type = "GRAPH_EDITOR"                    
+        
+        scene.frame_current = 0
+        
+        createFCurves(mesh, frames, 1, "blocks")
+        
+        #deselct all fcurves
+        fcurves = ob.data.animation_data.action.fcurves.data.fcurves
+        for i in fcurves:
+            i.select = False
+            
+        max = scene.cubester_audio_max_freq
+        min = scene.cubester_audio_min_freq
+        freq_frame = scene.cubester_audio_offset_type
+        
+        if freq_frame == "freq":
+            off = scene.cubester_audio_freq_offset
+        else:
+            off = scene.cubester_audio_frame_offset
+        
+        freq_step = (max - min) / length 
+
+        #animate each block with a portion of the frequency
+        for c in range(length):   
+            cur_off = 0                  
+            for r in range(width):
+                if freq_frame == "frame":
+                    scene.frame_current = cur_off
+                    l = c * freq_step
+                    h = (c + 1) * freq_step              
+                else:
+                    l = c * freq_step + cur_off 
+                    h = (c + 1) * freq_step - cur_off   
+                    
+                pos = c + (r * length) #block number
+                index = pos * 4 #first index for vertex                                            
+                
+                #select curves
+                for i in range(index, index + 4):
+                    curve = i * 3 + 2 #fcurve location       
+                    fcurves[curve].select = True                                
+                                                                   
+                bpy.ops.graph.sound_bake(filepath = path.abspath(filepath), low = l, high = h)
+                
+                #deselect curves   
+                for i in range(index, index + 4):
+                    curve = i * 3 + 2 #fcurve location   
+                    fcurves[curve].select = False
+                
+                cur_off += off
+
+        area.type = old_type
+        
     else:
-        off = scene.cubester_audio_frame_offset
-    
-    freq_step = (max - min) / length 
+        frame_data = WAVAudioFileData(scene)
+        columns = scene.cubester_audio_length_blocks
+        
+        #use data to animate mesh                    
+        action = bpy.data.actions.new("CubeSterAnimation")
 
-    #animate each block with a portion of the frequency
-    for c in range(length):   
-        cur_off = 0                  
-        for r in range(width):
-            if freq_frame == "freq":
-                scene.frame_current = frame_off
-                l = c * freq_step
-                h = (c + 1) * freq_step              
-            else:
-                l = c * freq_step + cur_off 
-                h = (c + 1) * freq_step - cur_off   
-                
-            pos = c + (r * length) #block number
-            index = pos * 4 #first index for vertex                                            
-            
-            #select curves
-            for i in range(index, index + 4):
-                curve = i * 3 + 2 #fcurve location       
-                fcurves[curve].select = True                                
-                                                               
-            bpy.ops.graph.sound_bake(filepath = path.abspath(filepath), low = l, high = h)
-            
-            #deselect curves   
-            for i in range(index, index + 4):
-                curve = i * 3 + 2 #fcurve location   
-                fcurves[curve].select = False
-            
-            cur_off += off
+        mesh.animation_data_create()
+        mesh.animation_data.action = action        
 
-    area.type = old_type
+        data_path = "vertices[%d].co"  
+        
+        #create fcurves first
+        cur_vert = 4
+        while cur_vert < len(ob.data.vertices):
+            for i in range(4):
+                fcurves = [action.fcurves.new(data_path % (cur_vert + i), fr) for fr in range(3)] #fcurves for x, y, z    
+            cur_vert += 8  
+            
+        fcurves = action.fcurves                     
+        
+        #loop for every face height value            
+        for frame_index in range(len(frame_data)):
+            frame = frame_data[frame_index]                       
+            
+            for column_index in range(len(frame)):
+                column = frame[column_index]
                 
+                for row_index in range(len(column)):
+                    height = column[row_index] / 20
+                    vert_index = ((row_index * columns) + column_index) * 8 + 4                    
+                    
+                    for i in range(4): #for each vertex                                            
+                        temp_v = mesh.vertices[vert_index + i].co                                 
+                        vals = [temp_v[0], temp_v[1], height] #new x, y, z positions
+                        curve_pos = (column_index + (row_index * columns)) * 12 + (i * 3)
+                        
+                        for i2 in range(3):                                                                          
+                            fcurves[curve_pos + i2].keyframe_points.insert(frame_index, vals[i2], {'FAST'})   
+                                      
 #generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
     context = bpy.context
@@ -553,20 +596,85 @@ def materialFrameHandler(scene):
                 
         #if the object is no longer in the scene then delete then entry
         else:
-            del scene.cubester_vertex_colors[i]            
+            del scene.cubester_vertex_colors[i]  
+            
+#wave audio data
+def WAVAudioFileData(scene):
+    frame_rate = 24
+    num_columns = scene.cubester_audio_length_blocks
+    num_rows = scene.cubester_audio_width_blocks
+    high_freq = scene.cubester_audio_max_freq
+    low_freq = scene.cubester_audio_min_freq
+
+    frame_data = [] # data for each frame
+
+    # open up a wave
+    wf = wave.open(path.abspath(scene.cubester_audio_path), "rb")
+    swidth = wf.getsampwidth()
+
+    length = wf.getnframes() / wf.getframerate() # in seconds as total number of frames divided by frame rate
+
+    frames = int(length * frame_rate) # the number of Blender frames this will be
+    chunk_size = int(wf.getnframes() / frames) # the amount of audio frames for each Blender frame
+
+    RATE = wf.getframerate()
+    # use a Blackman window
+    window = np.blackman(chunk_size * 2)
+
+    data = wf.readframes(chunk_size) # get the first chunk of data
+    freq_step = (high_freq - low_freq) / num_columns # the amount of frequency range each block will have
+    freq_sub_step = freq_step / num_rows # step for each row
+
+    for i in range(frames): # for every frame
+        cur_frame = []
+
+        if len(window) != len(data):
+            window = np.blackman(len(data) / 2)
+
+        in_data = np.array(wave.struct.unpack("%dh"%(len(data)/swidth), data)) * window
+        fft_data = abs(np.fft.rfft(in_data)) ** 2
+        fft_data.sort()
+
+        freq_data = fft_data * RATE / chunk_size
+
+        cur_index = 0
+        freq_low = 0
+        freq_high = freq_sub_step
+
+        for i2 in range(num_columns): # for every column
+            row_data = []
+
+            for row in range(num_rows): # for every row
+                cur_data = []
+                # collect values between low and high points, cur_index is used to keep track of where to start at
+                while (cur_index < len(freq_data) and freq_data[cur_index] >= freq_low and freq_data[cur_index] < freq_high):
+                    cur_data.append(freq_data[cur_index])
+                    cur_index += 1
+
+                row_data.append(len(cur_data)) # add values to row value
+                freq_low += freq_sub_step
+                freq_high += freq_sub_step
+
+            cur_frame.append(row_data) # add all row data to the current frame
+
+        frame_data.append(cur_frame)
+        data = wf.readframes(chunk_size)
+        
+    return frame_data          
 
 #main properties
 bpy.types.Scene.cubester_audio_image = EnumProperty(name = "Input Type", items = (("image", "Image", ""), ("audio", "Audio", "")))
 #audio
 bpy.types.Scene.cubester_audio_path = StringProperty(default = "", name = "Audio File", subtype = "FILE_PATH") 
+bpy.types.Scene.cubester_audio_feature_set = EnumProperty(name = "Feature Set", items = (("default", "Default", ""), ("experimental", "Experimental", "Only works with WAV files")))
 bpy.types.Scene.cubester_audio_min_freq = IntProperty(name = "Minimum Frequency", min = 20, max = 100000, default = 20)
-bpy.types.Scene.cubester_audio_max_freq = IntProperty(name = "Maximum Frequency", min = 21, max = 999999, default = 15000)
+bpy.types.Scene.cubester_audio_max_freq = IntProperty(name = "Maximum Frequency", min = 21, max = 999999, default = 5000)
 bpy.types.Scene.cubester_audio_offset_type = EnumProperty(name = "Offset Type", items = (("freq", "Frequency Offset", ""), ("frame", "Frame Offset", "")), description = "Type of offset per row of mesh")
 bpy.types.Scene.cubester_audio_freq_offset = IntProperty(name = "Frequency Offset", min = 0, max = 1000, default = 20)
 bpy.types.Scene.cubester_audio_frame_offset = IntProperty(name = "Frame Offset", min = 0, max = 10, default = 2)
 bpy.types.Scene.cubester_audio_block_layout = EnumProperty(name = "Block Layout", items = (("rectangle", "Rectangular", ""), ("radial", "Radial", "")))
 bpy.types.Scene.cubester_audio_width_blocks = IntProperty(name = "Width Block Count", min = 1, max = 10000, default = 5)
-bpy.types.Scene.cubester_audio_length_blocks = IntProperty(name = "Length Block Count", min = 6, max = 10000, default = 50)
+bpy.types.Scene.cubester_audio_length_blocks = IntProperty(name = "Length Block Count", min = 1, max = 10000, default = 50)
 #image
 bpy.types.Scene.cubester_load_type = EnumProperty(name = "Image Input Type", items = (("single", "Single Image", ""), ("multiple", "Image Sequence", "")))
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
@@ -669,6 +777,7 @@ class CubeSterPanel(bpy.types.Panel):
         #audio file
         else:               
             layout.prop(scene, "cubester_audio_path")
+            layout.prop(scene, "cubester_audio_feature_set")
             layout.separator()
             box = layout.box()
             

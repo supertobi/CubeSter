@@ -667,7 +667,6 @@ bpy.types.Scene.cubester_audio_feature_set = EnumProperty(name = "Feature Set", 
 bpy.types.Scene.cubester_audio_min_freq = IntProperty(name = "Minimum Frequency", min = 20, max = 100000, default = 20)
 bpy.types.Scene.cubester_audio_max_freq = IntProperty(name = "Maximum Frequency", min = 21, max = 999999, default = 5000)
 bpy.types.Scene.cubester_audio_offset_type = EnumProperty(name = "Offset Type", items = (("freq", "Frequency Offset", ""), ("frame", "Frame Offset", "")), description = "Type of offset per row of mesh")
-bpy.types.Scene.cubester_audio_freq_offset = IntProperty(name = "Frequency Offset", min = 0, max = 1000, default = 20)
 bpy.types.Scene.cubester_audio_frame_offset = IntProperty(name = "Frame Offset", min = 0, max = 10, default = 2)
 bpy.types.Scene.cubester_audio_block_layout = EnumProperty(name = "Block Layout", items = (("rectangle", "Rectangular", ""), ("radial", "Radial", "")))
 bpy.types.Scene.cubester_audio_width_blocks = IntProperty(name = "Width Block Count", min = 1, max = 10000, default = 5)
@@ -782,10 +781,8 @@ class CubeSterPanel(bpy.types.Panel):
             box.prop(scene, "cubester_audio_max_freq")
             box.separator()
             box.prop(scene, "cubester_audio_offset_type")
-            if scene.cubester_audio_offset_type == "freq":
-                box.prop(scene, "cubester_audio_freq_offset")
-            else:
-                box.prop(scene, "cubester_audio_frame_offset")
+            if scene.cubester_audio_offset_type == "frame":
+                box.prop(scene, "cubester_audio_frame_offset")                
             box.separator()
             box.prop(scene, "cubester_audio_block_layout")
             box.prop(scene, "cubester_audio_width_blocks") 

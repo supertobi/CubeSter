@@ -874,7 +874,7 @@ class CubeSter(bpy.types.Operator):
         else:
             created = len(frames)
             
-        if scene.cubester_mesh_style == "blocks":
+        if scene.cubester_mesh_style == "blocks" or scene.cubester_audio_image == "audio":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks and " + str(created) + " frame(s) in " + str(stop - start)) 
         else:
             print("CubeSter: " + str(len(verts)) + " points and " + str(created) + " frame(s) in "+ str(stop - start))  

@@ -191,24 +191,23 @@ def createMeshFromAudio(scene, verts, faces):
         min = scene.cubester_audio_min_freq
         freq_frame = scene.cubester_audio_offset_type
         
-        if freq_frame == "freq":
-            off = scene.cubester_audio_freq_offset
-        else:
-            off = scene.cubester_audio_frame_offset
-        
         freq_step = (max - min) / length 
+        freq_sub_step = freq_step / width
+        
+        frame_step = scene.cubester_audio_frame_offset                
 
         #animate each block with a portion of the frequency
         for c in range(length):   
-            cur_off = 0                  
+            frame_off = 0                  
             for r in range(width):
                 if freq_frame == "frame":
-                    scene.frame_current = cur_off
+                    scene.frame_current = frame_off
                     l = c * freq_step
-                    h = (c + 1) * freq_step              
+                    h = (c + 1) * freq_step  
+                    frame_off += frame_step           
                 else:
-                    l = c * freq_step + cur_off 
-                    h = (c + 1) * freq_step - cur_off   
+                    l = c * freq_step + (r * freq_sub_step) 
+                    h = c * freq_step  + ((r + 1) * freq_sub_step)  
                     
                 pos = c + (r * length) #block number
                 index = pos * 4 #first index for vertex                                            
@@ -223,9 +222,7 @@ def createMeshFromAudio(scene, verts, faces):
                 #deselect curves   
                 for i in range(index, index + 4):
                     curve = i * 3 + 2 #fcurve location   
-                    fcurves[curve].select = False
-                
-                cur_off += off
+                    fcurves[curve].select = False               
 
         area.type = old_type
         

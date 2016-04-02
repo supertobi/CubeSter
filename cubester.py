@@ -225,7 +225,7 @@ def createMeshFromAudio(scene, verts, faces):
         area.type = old_type
         
     else:
-        frame_data = WAVAudioFileData(scene)
+        frame_data, max_value = WAVAudioFileData(scene)
         columns = scene.cubester_audio_length_blocks
         
         #use data to animate mesh                    
@@ -253,7 +253,7 @@ def createMeshFromAudio(scene, verts, faces):
                 column = frame[column_index]
                 
                 for row_index in range(len(column)):
-                    height = column[row_index] / 20
+                    height = column[row_index] / max_value
                     vert_index = ((row_index * columns) + column_index) * 8 + 4                    
                     
                     for i in range(4): #for each vertex                                            
@@ -262,7 +262,7 @@ def createMeshFromAudio(scene, verts, faces):
                         curve_pos = (column_index + (row_index * columns)) * 12 + (i * 3)
                         
                         for i2 in range(3):                                                                          
-                            fcurves[curve_pos + i2].keyframe_points.insert(frame_index, vals[i2], {'FAST'})   
+                            fcurves[curve_pos + i2].keyframe_points.insert(frame_index, vals[i2], {"FAST"})   
                                       
 #generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
@@ -599,66 +599,82 @@ def WAVAudioFileData(scene):
     import numpy as np
 
     frame_rate = 24
-    num_columns = scene.cubester_audio_length_blocks
-    num_rows = scene.cubester_audio_width_blocks
-    high_freq = scene.cubester_audio_max_freq
-    low_freq = scene.cubester_audio_min_freq
+    columns = scene.cubester_audio_length_blocks
+    rows = scene.cubester_audio_width_blocks
+    max_freq = scene.cubester_audio_max_freq
+    min_freq = scene.cubester_audio_min_freq
 
-    frame_data = [] # data for each frame
+    freq_step = (max_freq - min_freq) / columns
+    freq_sub_step = freq_step / rows
 
-    # open up a wave
-    wf = wave.open(path.abspath(scene.cubester_audio_path), "rb")
-    swidth = wf.getsampwidth()
+    spf = wave.open(path.abspath(scene.cubester_audio_path),"r")
+    fs = spf.getframerate()
 
-    length = wf.getnframes() / wf.getframerate() # in seconds as total number of frames divided by frame rate
+    # Extract Raw Audio from Wav File
+    bytes = spf.getsampwidth()
+    channels = spf.getnchannels()
+    audio_frames = spf.getnframes()
+    length = audio_frames / fs # length in seconds
+    sub_step = int(audio_frames / (length * frame_rate)) #get the number of frames in each
+    vid_frames = int(length * frame_rate)
 
-    frames = int(length * frame_rate) # the number of Blender frames this will be
-    chunk_size = int(wf.getnframes() / frames) # the amount of audio frames for each Blender frame
+    full_signal = spf.readframes(-1)
 
-    RATE = wf.getframerate()
-    # use a Blackman window
-    window = np.blackman(chunk_size * 2)
+    # extract single channel from data
+    channel = []
+    for i in range(0, len(full_signal), bytes * channels):
+        channel.append(full_signal[i:i+bytes])
 
-    data = wf.readframes(chunk_size) # get the first chunk of data
-    freq_step = (high_freq - low_freq) / num_columns # the amount of frequency range each block will have
-    freq_sub_step = freq_step / num_rows # step for each row
+    channel = np.array(channel)
+    signal = np.fromstring(channel, "Int16") # basically loudness data
 
-    for i in range(frames): # for every frame
-        cur_frame = []
+    frame_loud = np.split(signal, [i * int(len(signal) / vid_frames) for i in range(1, vid_frames + 1)])
+    del frame_loud[len(frame_loud) - 1]
+    frame_loud_data = []
 
-        if len(window) != len(data):
-            window = np.blackman(len(data) / 2)
+    for i in frame_loud:
+        max_val = np.max(i)
+        if max_val != 0:
+            frame_loud_data.append((i[i>=0]) / max_val) # get only positive values and normalize
 
-        in_data = np.array(wave.struct.unpack("%dh"%(len(data)/swidth), data)) * window
-        fft_data = abs(np.fft.rfft(in_data)) ** 2
-        fft_data.sort()
+    frame_freq_data = []
+    window = np.blackman(len(frame_loud[0]))
 
-        freq_data = fft_data * RATE / chunk_size
+    max_value = 0
+    for i in frame_loud:
+        i = i * window
+        fftData = abs(np.fft.fft(i))
+        freqs = fftData * sub_step / spf.getframerate()
 
-        cur_index = 0
-        freq_low = 0
-        freq_high = freq_sub_step
+        # separate frequencies into bins
+        freqs = np.sort(freqs)
 
-        for i2 in range(num_columns): # for every column
-            row_data = []
+        temp_holder = [0 for i2 in range(columns * rows)]
 
-            for row in range(num_rows): # for every row
-                cur_data = []
-                # collect values between low and high points, cur_index is used to keep track of where to start at
-                while (cur_index < len(freq_data) and freq_data[cur_index] >= freq_low and freq_data[cur_index] < freq_high):
-                    cur_data.append(freq_data[cur_index])
-                    cur_index += 1
+        index = 0
+        freq_low = min_freq
+        for i2 in freqs:
+            if freq_low <= i2 < freq_low + freq_sub_step:
+                temp_holder[index] += 1
+            elif freq_low + freq_sub_step < i2 < max_freq:
+                if index + 1 < (columns * rows):
+                    temp_holder[index + 1] += 1
+                    freq_low += freq_sub_step
+                    index += 1
+                    
+        if max(temp_holder) > max_value:
+            max_value = max(temp_holder)
 
-                row_data.append(len(cur_data)) # add values to row value
-                freq_low += freq_sub_step
-                freq_high += freq_sub_step
-
-            cur_frame.append(row_data) # add all row data to the current frame
-
-        frame_data.append(cur_frame)
-        data = wf.readframes(chunk_size)
+        # split into sub rows
+        temp_holder2 = []
+        for c in range(columns):
+            temp_row = []
+            for r in range(rows):
+                temp_row.append(temp_holder[(c * rows) + r])
+            temp_holder2.append(temp_row)
+        frame_freq_data.append(temp_holder2)
         
-    return frame_data          
+    return frame_freq_data, max_value         
 
 #main properties
 bpy.types.Scene.cubester_audio_image = EnumProperty(name = "Input Type", items = (("image", "Image", ""), ("audio", "Audio", "")))

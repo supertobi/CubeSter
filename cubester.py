@@ -110,45 +110,33 @@ def createFCurves(mesh, frames, frame_step_size, style):
                    
 #create material with given name, apply to object
 def createMaterial(scene, ob, name):
+    #add all nodes, only link ones needed
     mat = bpy.data.materials.new("CubeSter_" + name)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes 
+               
+    att = nodes.new("ShaderNodeAttribute")
+    att.attribute_name = "Col"
+    att.location = (-200, 300)
     
-    #image
+    att = nodes.new("ShaderNodeTexImage")
     if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
-        image = bpy.data.images[scene.cubester_color_image]
+        att.image = bpy.data.images[scene.cubester_color_image]
     else:
-        image = bpy.data.images[scene.cubester_image]  
+        att.image = bpy.data.images[scene.cubester_image]
     
-    if scene.render.engine == "CYCLES":
-        mat.use_nodes = True
-        nodes = mat.node_tree.nodes 
-                   
-        att = nodes.new("ShaderNodeAttribute")
-        att.attribute_name = "Col"
-        att.location = (-200, 300)
-        
-        att = nodes.new("ShaderNodeTexImage")
-        att.image = image
-        
-        if scene.cubester_load_type == "multiple":
-            att.image.source = "SEQUENCE"
-        att.location = (-200, 700)                
-        
-        att = nodes.new("ShaderNodeTexCoord")
-        att.location = (-450, 600)
-        
-        if scene.cubester_materials == "image":
-            mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])                
-            mat.node_tree.links.new(nodes["Texture Coordinate"].outputs[2], nodes["Image Texture"].inputs[0])
-        else:
-            mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
-    else:                
-        if scene.cubester_materials == "image" or scene.render.engine != "BLENDER_RENDER":
-            tex = bpy.data.textures.new("CubeSter_" + name, "IMAGE")
-            tex.image = image
-            slot = mat.texture_slots.add()
-            slot.texture = tex
-        else:
-            mat.use_vertex_color_paint = True
+    if scene.cubester_load_type == "multiple":
+        att.image.source = "SEQUENCE"
+    att.location = (-200, 700)                
+    
+    att = nodes.new("ShaderNodeTexCoord")
+    att.location = (-450, 600)
+    
+    if scene.cubester_materials == "image":
+        mat.node_tree.links.new(nodes["Image Texture"].outputs[0], nodes["Diffuse BSDF"].inputs[0])                
+        mat.node_tree.links.new(nodes["Texture Coordinate"].outputs[2], nodes["Image Texture"].inputs[0])
+    else:
+        mat.node_tree.links.new(nodes["Attribute"].outputs[0], nodes["Diffuse BSDF"].inputs[0])
     
     ob.data.materials.append(mat) 
     
@@ -303,20 +291,21 @@ def createMeshFromImage(scene, verts, faces):
         createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
     
     #material
-    #determine name and if already created
-    if scene.cubester_materials == "vertex": #vertex color
-        image_name = "Vertex"             
-    elif not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images and scene.cubester_materials == "image": #replaced image
-        image_name = scene.cubester_color_image
-    else: #normal image
-        image_name = scene.cubester_image
-     
-    #either add material or create   
-    if ("CubeSter_" + image_name)  in bpy.data.materials:
-        ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
-    
-    #create material
-    else:
+    if scene.render.engine == "CYCLES":
+        #determine name and if already created
+        if scene.cubester_materials == "vertex": #vertex color
+            image_name = "Vertex"             
+        elif not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images and scene.cubester_materials == "image": #replaced image
+            image_name = scene.cubester_color_image
+        else: #normal image
+            image_name = scene.cubester_image
+         
+        #either add material or create   
+        if ("CubeSter_" + image_name)  in bpy.data.materials:
+            ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
+        
+        #create material
+        else:
              createMaterial(scene, ob, image_name)              
                   
     #vertex colors
@@ -370,7 +359,7 @@ def createMeshFromImage(scene, verts, faces):
             frames_vert_colors.append(frame_colors)
 
         #determine what data to use
-        if scene.cubester_materials == "vertex" or scene.render.engine == "BLENDER_ENGINE":  
+        if scene.cubester_materials == "vertex":  
             scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
                     "frame_skip" : scene.cubester_frame_step, "total_images" : max}
         else:
@@ -504,7 +493,7 @@ def findSequenceImages(context):
                     images[0].append(os.path.join(dir_name, file))
                     images[1].append(file)
         except:
-            print("CubeSter: " + dir_name + " directory not found")
+            print("CubeSter: " + dir_name + " dirctory not found")
         
     return images
 

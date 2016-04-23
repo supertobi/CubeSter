@@ -618,8 +618,8 @@ class CubeSterPanel(bpy.types.Panel):
         
         layout.prop(scene, "cubester_audio_image", icon = "IMAGE_COL")
         layout.separator()
-        
-        if scene.cubester_audio_image == "image":
+    
+        if scene.cubester_audio_image == "image":            
             box = layout.box()
             box.prop(scene, "cubester_load_type")        
             box.label("Image To Convert:")
@@ -652,26 +652,7 @@ class CubeSterPanel(bpy.types.Panel):
             box.prop(scene, "cubester_mesh_style", icon = "MESH_GRID")
         
             if scene.cubester_mesh_style == "blocks":            
-                box.prop(scene, "cubester_block_style") 
-                box.separator()
-            
-            box.prop(scene, "cubester_materials", icon = "MATERIAL")
-            
-            #if using uvs for image, then give option to use different image for color
-            if scene.cubester_materials == "image":
-                box.separator()
-                box.prop(scene, "cubester_use_image_color", icon = "COLOR")
-            
-                if not scene.cubester_use_image_color:
-                    box.label("Image To Use For Colors:")
-                    box.prop_search(scene, "cubester_color_image", bpy.data, "images")
-                    box.prop(scene, "cubester_load_color_image")                         
-        
-            if scene.cubester_image in bpy.data.images:
-                layout.separator()
-                box = layout.box()
-                rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
-                columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))
+                box.prop(scene, "cubester_block_style")                             
         
         #audio file
         else:               
@@ -692,7 +673,28 @@ class CubeSterPanel(bpy.types.Panel):
             if scene.cubester_audio_block_layout != "radial":
                 box.prop(scene, "cubester_audio_length_blocks")
                 
-            box.prop(scene, "cubester_size_per_hundred_pixels")                        
+            box.prop(scene, "cubester_size_per_hundred_pixels")   
+        
+        #materials
+        layout.separator()
+        box = layout.box()    
+        box.prop(scene, "cubester_materials", icon = "MATERIAL")  
+           
+        #if using uvs for image, then give option to use different image for color
+        if scene.cubester_materials == "image":
+            box.separator()
+            
+            if scene.cubester_audio_image == "image":
+                box.prop(scene, "cubester_use_image_color", icon = "COLOR")
+        
+            if not scene.cubester_use_image_color or scene.cubester_audio_image == "audio":
+                box.label("Image To Use For Colors:")
+                box.prop_search(scene, "cubester_color_image", bpy.data, "images")
+                box.prop(scene, "cubester_load_color_image")                         
+        
+        if scene.cubester_image in bpy.data.images:
+            rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
+            columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))                     
         
         layout.separator()
         box = layout.box()                

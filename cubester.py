@@ -154,7 +154,7 @@ def createMaterial(scene, ob, name):
     
 #generate mesh from audio
 def createMeshFromAudio(scene, verts, faces):
-    filepath = scene.cubester_audio_path
+    audio_filepath = scene.cubester_audio_path
     width = scene.cubester_audio_width_blocks
     length = scene.cubester_audio_length_blocks
     size_per_hundred = scene.cubester_size_per_hundred_pixels
@@ -170,7 +170,7 @@ def createMeshFromAudio(scene, verts, faces):
             
             x += size            
         y += size
-    
+        
     #create object   
     mesh = bpy.data.meshes.new("cubed")
     mesh.from_pydata(verts, [], faces)
@@ -178,7 +178,59 @@ def createMeshFromAudio(scene, verts, faces):
     bpy.context.scene.objects.link(ob)
     bpy.context.scene.objects.active = ob
     ob.select = True
+        
+    #inital vertex colors
+    picture = bpy.data.images[scene.cubester_color_image]
+    pixels = list(picture.pixels)
+    vert_colors = []
     
+    skip_y = int(picture.size[1] / width)
+    skip_x = int(picture.size[0] / length)
+    
+    for row in range(0, picture.size[1], skip_y + 1): 
+        #go through each column, step by appropriate amount
+        for column in range(0, picture.size[0] * 4, 4 + skip_x * 4):   
+            r, g, b, a = getPixelValues(picture, pixels, row, column)
+            vert_colors += [(r, g, b) for i in range(24)]
+            
+    bpy.ops.mesh.vertex_color_add()        
+    i = 0
+    for c in ob.data.vertex_colors[0].data:
+        c.color = vert_colors[i]
+        i += 1
+            
+    #each frames vertex colors
+    frames = []        
+    #image squence handling
+    if scene.cubester_load_type == "multiple":            
+        images = findSequenceImages(bpy.context)
+                    
+        frames_vert_colors = []
+        
+        if len(images[0]) > scene.cubester_max_images:
+            max = scene.cubester_max_images + 1
+        else:
+            max = len(images[0])            
+        
+        #goes through and for each image for each block finds new height
+        for image_index in range(0, max, scene.cubester_skip_images):
+            filepath = images[0][image_index]
+            name = images[1][image_index]                                
+            picture = fetchImage(name, filepath)
+            pixels = list(picture.pixels)
+            
+            frame_colors = []               
+            
+            for row in range(0, picture.size[1], skip_y + 1):        
+                for column in range(0, picture.size[0] * 4, 4 + skip_x * 4): 
+                    r, g, b, a = getPixelValues(picture, pixels, row, column)                        
+                    frame_colors += [(r, g, b) for i in range(24)]                                                         
+                                        
+            frames_vert_colors.append(frame_colors)
+
+        scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
+                "frame_skip" : scene.cubester_frame_step, "total_images" : max}                           
+
     #set keyframe for each object as inital point
     frame = [1 for i in range(int(len(verts) / 8))]
     frames = [frame]
@@ -226,7 +278,7 @@ def createMeshFromAudio(scene, verts, faces):
                 curve = i * 3 + 2 #fcurve location       
                 fcurves[curve].select = True                                
                                                                
-            bpy.ops.graph.sound_bake(filepath = path.abspath(filepath), low = l, high = h)
+            bpy.ops.graph.sound_bake(filepath = path.abspath(audio_filepath), low = l, high = h)
             
             #deselect curves   
             for i in range(index, index + 4):
@@ -678,7 +730,23 @@ class CubeSterPanel(bpy.types.Panel):
         #materials
         layout.separator()
         box = layout.box()    
-        box.prop(scene, "cubester_materials", icon = "MATERIAL")  
+        
+        if scene.cubester_audio_image == "image":
+            box.prop(scene, "cubester_materials", icon = "MATERIAL")  
+        else:
+            box.label("Material: Vertex Colors From Image")
+            box.prop(scene, "cubester_load_type")        
+        
+            #find number of approriate images if sequence
+            if scene.cubester_load_type == "multiple":
+                #display number of images found there            
+                images = findSequenceImages(context)
+                images_found = len(images[0]) if len(images[0]) <= scene.cubester_max_images else scene.cubester_max_images
+                if len(images[0]) > 0:
+                    box.label(str(len(images[0])) + " Images Found", icon = "PACKAGE")
+                box.prop(scene, "cubester_max_images")
+                box.prop(scene, "cubester_skip_images")
+                box.prop(scene, "cubester_frame_step")
            
         #if using uvs for image, then give option to use different image for color
         if scene.cubester_materials == "image":

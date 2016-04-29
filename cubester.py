@@ -28,6 +28,7 @@ import bpy
 from bpy.props import BoolProperty, IntProperty, FloatProperty, StringProperty, EnumProperty
 import timeit 
 from random import uniform
+from math import radians
 import bmesh
 import os
 from bpy import path
@@ -234,7 +235,7 @@ def createMeshFromAudio(scene, verts, faces):
         if ("CubeSter_" + "Vertex")  in bpy.data.materials:
             ob.data.materials.append(bpy.data.materials["CubeSter_" + "Vertex"])
         else:
-             createMaterial(scene, ob, "Vertex")                         
+             createMaterial(scene, ob, "Veratex")                         
 
     #set keyframe for each object as inital point
     frame = [1 for i in range(int(len(verts) / 8))]
@@ -290,7 +291,23 @@ def createMeshFromAudio(scene, verts, faces):
                 curve = i * 3 + 2 #fcurve location   
                 fcurves[curve].select = False               
 
-    area.type = old_type         
+    area.type = old_type 
+    
+    #if radial apply needed modifiers
+    if scene.cubester_audio_block_layout == "radial":
+        # add bezier curve of correct width
+        bpy.ops.curve.primitive_bezier_circle_add()
+        curve = bpy.context.object
+        curve.dimensions = (width * size / 2, width * size / 2, 1.0)  
+
+        ob.select = True    
+        curve.select = False
+        scene.objects.active = ob
+        
+        ob.rotation_euler = (radians(-90), 0.0, 0.0)
+        bpy.ops.object.modifier_add(type = "CURVE")
+        ob.modifiers["Curve"].object = curve
+        ob.modifiers["Curve"].deform_axis = "POS_Z"             
                                       
 #generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
@@ -725,10 +742,8 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop(scene, "cubester_audio_frame_offset")                
             box.separator()
             box.prop(scene, "cubester_audio_block_layout")
-            box.prop(scene, "cubester_audio_width_blocks") 
-                       
-            if scene.cubester_audio_block_layout != "radial":
-                box.prop(scene, "cubester_audio_length_blocks")
+            box.prop(scene, "cubester_audio_width_blocks")                                    
+            box.prop(scene, "cubester_audio_length_blocks")
                 
             box.prop(scene, "cubester_size_per_hundred_pixels")   
         

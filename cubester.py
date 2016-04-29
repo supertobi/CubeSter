@@ -298,7 +298,8 @@ def createMeshFromAudio(scene, verts, faces):
         # add bezier curve of correct width
         bpy.ops.curve.primitive_bezier_circle_add()
         curve = bpy.context.object
-        curve.dimensions = (length * size - (size / 2), length * size - (size / 2), 0.0)
+        curve_size = (0.319 * (width * (size * 100)) - 0.0169) / 100
+        curve.dimensions = (curve_size, curve_size, 0.0)
         curve.scale = (curve.scale[0], curve.scale[0], curve.scale[0]) #correct for z height   
 
         ob.select = True    

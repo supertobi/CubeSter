@@ -163,9 +163,9 @@ def createMeshFromAudio(scene, verts, faces):
     size = size_per_hundred / 100   
     
     #create all blocks
-    y = -(width / 2) * size
+    y = -(width / 2) * size + (size / 2)
     for r in range(width):        
-        x = -(length / 2) * size
+        x = -(length / 2) * size + (size / 2)
         for c in range(length):
             createBlock(x, y, size / 2, 1, verts, faces)
             
@@ -298,7 +298,8 @@ def createMeshFromAudio(scene, verts, faces):
         # add bezier curve of correct width
         bpy.ops.curve.primitive_bezier_circle_add()
         curve = bpy.context.object
-        curve.dimensions = (width * size / 2, width * size / 2, 1.0)  
+        curve.dimensions = (length * size - (size / 2), length * size - (size / 2), 0.0)
+        curve.scale = (curve.scale[0], curve.scale[0], curve.scale[0]) #correct for z height   
 
         ob.select = True    
         curve.select = False
@@ -307,7 +308,7 @@ def createMeshFromAudio(scene, verts, faces):
         ob.rotation_euler = (radians(-90), 0.0, 0.0)
         bpy.ops.object.modifier_add(type = "CURVE")
         ob.modifiers["Curve"].object = curve
-        ob.modifiers["Curve"].deform_axis = "POS_Z"             
+        ob.modifiers["Curve"].deform_axis = "POS_Z"               
                                       
 #generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
@@ -744,8 +745,8 @@ class CubeSterPanel(bpy.types.Panel):
             box.prop(scene, "cubester_audio_block_layout")
             box.prop(scene, "cubester_audio_width_blocks")                                    
             box.prop(scene, "cubester_audio_length_blocks")
-                
-            box.prop(scene, "cubester_size_per_hundred_pixels")   
+             
+            box.prop(scene, "cubester_size_per_hundred_pixels")  
         
         #materials
         layout.separator()

@@ -1,18 +1,18 @@
-#This program is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#This program is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#You should have received a copy of the GNU General Public License
-#along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#Original Author = Jacob Morris
-#URL = blendingjacob.blogspot.com
+# Original Author = Jacob Morris
+# URL = blendingjacob.blogspot.com
 
 bl_info = {
     "name" : "CubeSter",
@@ -33,7 +33,7 @@ import bmesh
 import os
 from bpy import path
 
-#load image if possible
+# load image if possible
 def adjustSelectedImage(self, context):
     scene = context.scene
     try:
@@ -42,7 +42,7 @@ def adjustSelectedImage(self, context):
     except:
         print("CubeSter: " + scene.cubester_load_image + " could not be loaded")
 
-#load color image if possible        
+# load color image if possible        
 def adjustSelectedColorImage(self, context):
     scene = context.scene
     try:
@@ -51,7 +51,7 @@ def adjustSelectedColorImage(self, context):
     except:
         print("CubeSter: " + scene.cubester_load_color_image + " could not be loaded")                          
 
-#crate block at center position x, y with block width 2*hx and 2*hy and height of h    
+# crate block at center position x, y with block width 2*hx and 2*hy and height of h    
 def createBlock(x, y, hw, h, verts, faces):    
     if bpy.context.scene.cubester_block_style == "size":
         z = 0.0
@@ -66,9 +66,9 @@ def createBlock(x, y, hw, h, verts, faces):
     faces += [(p, p+1, p+5, p+4), (p+1, p+2, p+6, p+5), (p+2, p+3, p+7, p+6), (p, p+4, p+7, p+3), (p+4, p+5, p+6, p+7),
         (p, p+3, p+2, p+1)]
         
-#go through all frames in len(frames), adjusting values at frames[x][y]
+# go through all frames in len(frames), adjusting values at frames[x][y]
 def createFCurves(mesh, frames, frame_step_size, style):
-    #use data to animate mesh                    
+    # use data to animate mesh                    
     action = bpy.data.actions.new("CubeSterAnimation")
 
     mesh.animation_data_create()
@@ -77,43 +77,43 @@ def createFCurves(mesh, frames, frame_step_size, style):
     data_path = "vertices[%d].co" 
     
     if style == "blocks":   
-        vert_index = 4 #index of first vert
+        vert_index = 4 # index of first vert
     else:
         vert_index = 0                  
     
-    #loop for every face height value            
+    # loop for every face height value            
     for frame_start_vert in range(len(frames[0])): 
-        #only go once if plane, otherwise do all four vertices that are in top plane if blocks   
+        # only go once if plane, otherwise do all four vertices that are in top plane if blocks   
         if style == "blocks":   
             end_point = frame_start_vert + 4
         else:
             end_point = frame_start_vert + 1
             
-        #loop through to get the four vertices that compose the face                                
+        # loop through to get the four vertices that compose the face                                
         for frame_vert in range(frame_start_vert, end_point):
             fcurves = [action.fcurves.new(data_path % vert_index, i) for i in range(3)] #fcurves for x, y, z
-            frame_counter = 0 #go through each frame and add position                   
+            frame_counter = 0 # go through each frame and add position                   
             temp_v = mesh.vertices[vert_index].co                 
             
-            #loop through frames
+            # loop through frames
             for frame in frames:
-                vals = [temp_v[0], temp_v[1], frame[frame_start_vert]] #new x, y, z positions
-                for i in range(3): #for each x, y, z set each corresponding fcurve                                                        
+                vals = [temp_v[0], temp_v[1], frame[frame_start_vert]] # new x, y, z positions
+                for i in range(3): # for each x, y, z set each corresponding fcurve                                                        
                     fcurves[i].keyframe_points.insert(frame_counter, vals[i], {'FAST'})   
                 
-                frame_counter += frame_step_size #skip frames for smoother animation   
+                frame_counter += frame_step_size # skip frames for smoother animation   
                 
             vert_index += 1
             
-        #only skip vertices if made of blocks
+        # only skip vertices if made of blocks
         if style == "blocks":
             vert_index += 4
                    
-#create material with given name, apply to object
+# create material with given name, apply to object
 def createMaterial(scene, ob, name):
     mat = bpy.data.materials.new("CubeSter_" + name)
     
-    #image
+    # image
     if not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images:
         image = bpy.data.images[scene.cubester_color_image]
     else:
@@ -153,7 +153,7 @@ def createMaterial(scene, ob, name):
     
     ob.data.materials.append(mat) 
     
-#generate mesh from audio
+# generate mesh from audio
 def createMeshFromAudio(scene, verts, faces):
     audio_filepath = scene.cubester_audio_path
     width = scene.cubester_audio_width_blocks
@@ -162,7 +162,7 @@ def createMeshFromAudio(scene, verts, faces):
     
     size = size_per_hundred / 100   
     
-    #create all blocks
+    # create all blocks
     y = -(width / 2) * size + (size / 2)
     for r in range(width):        
         x = -(length / 2) * size + (size / 2)
@@ -172,7 +172,7 @@ def createMeshFromAudio(scene, verts, faces):
             x += size            
         y += size
         
-    #create object   
+    # create object   
     mesh = bpy.data.meshes.new("cubed")
     mesh.from_pydata(verts, [], faces)
     ob = bpy.data.objects.new("cubed", mesh)
@@ -180,7 +180,7 @@ def createMeshFromAudio(scene, verts, faces):
     bpy.context.scene.objects.active = ob
     ob.select = True
         
-    #inital vertex colors
+    # inital vertex colors
     if scene.cubester_materials == "image":
         picture = bpy.data.images[scene.cubester_color_image]
         pixels = list(picture.pixels)
@@ -190,7 +190,7 @@ def createMeshFromAudio(scene, verts, faces):
         skip_x = int(picture.size[0] / length)
         
         for row in range(0, picture.size[1], skip_y + 1): 
-            #go through each column, step by appropriate amount
+            # go through each column, step by appropriate amount
             for column in range(0, picture.size[0] * 4, 4 + skip_x * 4):   
                 r, g, b, a = getPixelValues(picture, pixels, row, column)
                 vert_colors += [(r, g, b) for i in range(24)]
@@ -201,7 +201,7 @@ def createMeshFromAudio(scene, verts, faces):
             c.color = vert_colors[i]
             i += 1
                  
-        #image squence handling
+        # image squence handling
         if scene.cubester_load_type == "multiple":            
             images = findSequenceImages(bpy.context)
                         
@@ -212,7 +212,7 @@ def createMeshFromAudio(scene, verts, faces):
             else:
                 max = len(images[0])            
             
-            #goes through and for each image for each block finds new height
+            # goes through and for each image for each block finds new height
             for image_index in range(0, max, scene.cubester_skip_images):
                 filepath = images[0][image_index]
                 name = images[1][image_index]                                
@@ -231,13 +231,13 @@ def createMeshFromAudio(scene, verts, faces):
             scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
                     "frame_skip" : scene.cubester_frame_step, "total_images" : max}     
                     
-        #either add material or create   
+        # either add material or create   
         if ("CubeSter_" + "Vertex")  in bpy.data.materials:
             ob.data.materials.append(bpy.data.materials["CubeSter_" + "Vertex"])
         else:
              createMaterial(scene, ob, "Veratex")                         
 
-    #set keyframe for each object as inital point
+    # set keyframe for each object as inital point
     frame = [1 for i in range(int(len(verts) / 8))]
     frames = [frame]
     
@@ -249,7 +249,7 @@ def createMeshFromAudio(scene, verts, faces):
     
     createFCurves(mesh, frames, 1, "blocks")
     
-    #deselct all fcurves
+    # deselct all fcurves
     fcurves = ob.data.animation_data.action.fcurves.data.fcurves
     for i in fcurves:
         i.select = False
@@ -263,7 +263,7 @@ def createMeshFromAudio(scene, verts, faces):
     
     frame_step = scene.cubester_audio_frame_offset                
 
-    #animate each block with a portion of the frequency
+    # animate each block with a portion of the frequency
     for c in range(length):   
         frame_off = 0                  
         for r in range(width):
@@ -276,31 +276,31 @@ def createMeshFromAudio(scene, verts, faces):
                 l = c * freq_step + (r * freq_sub_step) 
                 h = c * freq_step  + ((r + 1) * freq_sub_step)  
                 
-            pos = c + (r * length) #block number
-            index = pos * 4 #first index for vertex                                            
+            pos = c + (r * length) # block number
+            index = pos * 4 # first index for vertex                                            
             
-            #select curves
+            # select curves
             for i in range(index, index + 4):
-                curve = i * 3 + 2 #fcurve location       
+                curve = i * 3 + 2 # fcurve location       
                 fcurves[curve].select = True                                
                                                                
             bpy.ops.graph.sound_bake(filepath = path.abspath(audio_filepath), low = l, high = h)
             
-            #deselect curves   
+            # deselect curves   
             for i in range(index, index + 4):
-                curve = i * 3 + 2 #fcurve location   
+                curve = i * 3 + 2 # fcurve location   
                 fcurves[curve].select = False               
 
     area.type = old_type 
     
-    #if radial apply needed modifiers
+    # if radial apply needed modifiers
     if scene.cubester_audio_block_layout == "radial":
         # add bezier curve of correct width
         bpy.ops.curve.primitive_bezier_circle_add()
         curve = bpy.context.object
-        curve_size = (0.319 * (width * (size * 100)) - 0.0169) / 100
+        curve_size = (0.319 * (width * (size * 100)) - 0.0169) / 100 # slope determined off of collected data
         curve.dimensions = (curve_size, curve_size, 0.0)
-        curve.scale = (curve.scale[0], curve.scale[0], curve.scale[0]) #correct for z height   
+        curve.scale = (curve.scale[0], curve.scale[0], curve.scale[0]) # correct for z height   
 
         ob.select = True    
         curve.select = False
@@ -311,7 +311,7 @@ def createMeshFromAudio(scene, verts, faces):
         ob.modifiers["Curve"].object = curve
         ob.modifiers["Curve"].deform_axis = "POS_Z"               
                                       
-#generate mesh from image(s)
+# generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
     context = bpy.context
     picture = bpy.data.images[scene.cubester_image]
@@ -330,19 +330,19 @@ def createMeshFromImage(scene, verts, faces):
 
     vert_colors = []
      
-    weights = [uniform(0.0, 1.0) for i in range(4)] #random weights  
+    weights = [uniform(0.0, 1.0) for i in range(4)] # random weights  
     rows = 0             
 
-    #go through each row of pixels stepping by scene.cubester_skip_pixels + 1
+    # go through each row of pixels stepping by scene.cubester_skip_pixels + 1
     for row in range(0, picture.size[1], scene.cubester_skip_pixels + 1): 
         rows += 1          
-        x = -width / 2 + half_width #reset to left edge of mesh
-        #go through each column, step by appropriate amount
+        x = -width / 2 + half_width # reset to left edge of mesh
+        # go through each column, step by appropriate amount
         for column in range(0, picture.size[0] * 4, 4 + scene.cubester_skip_pixels * 4):                        
             r, g, b, a = getPixelValues(picture, pixels, row, column)
             h = findPointHeight(r, g, b, a, scene)
             
-            #if not transparent
+            # if not transparent
             if h != -1:                   
                 if scene.cubester_mesh_style == "blocks":
                     createBlock(x, y, half_width, h, verts, faces)
@@ -354,11 +354,11 @@ def createMeshFromImage(scene, verts, faces):
             x += step               
         y += step
         
-        #if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
+        # if creating plane not blocks, then remove last 4 items from vertex_colors as the faces have already wrapped around
         if scene.cubester_mesh_style == "plane":
             del vert_colors[len(vert_colors) - 4:len(vert_colors)]                        
         
-    #create faces if plane based and not block based
+    # create faces if plane based and not block based
     if scene.cubester_mesh_style == "plane":
         off = int(len(verts) / rows)
         for r in range(rows - 1):
@@ -372,30 +372,30 @@ def createMeshFromImage(scene, verts, faces):
     context.scene.objects.active = ob        
     ob.select = True
     
-    #uv unwrap
+    # uv unwrap
     if scene.cubester_mesh_style == "blocks":
         createUVMap(context, rows, int(len(faces) / 6 / rows))
     else:
         createUVMap(context, rows - 1, int(len(faces) / (rows - 1)))
     
-    #material
-    #determine name and if already created
+    # material
+    # determine name and if already created
     if scene.cubester_materials == "vertex": #vertex color
         image_name = "Vertex"             
     elif not scene.cubester_use_image_color and scene.cubester_color_image in bpy.data.images and scene.cubester_materials == "image": #replaced image
         image_name = scene.cubester_color_image
-    else: #normal image
+    else: # normal image
         image_name = scene.cubester_image
      
     #either add material or create   
     if ("CubeSter_" + image_name)  in bpy.data.materials:
         ob.data.materials.append(bpy.data.materials["CubeSter_" + image_name])
     
-    #create material
+    # create material
     else:
          createMaterial(scene, ob, image_name)              
                   
-    #vertex colors
+    # vertex colors
     bpy.ops.mesh.vertex_color_add()        
     i = 0
     for c in ob.data.vertex_colors[0].data:
@@ -403,7 +403,7 @@ def createMeshFromImage(scene, verts, faces):
         i += 1        
     
     frames = []        
-    #image squence handling
+    # image squence handling
     if scene.cubester_load_type == "multiple":            
         start = timeit.default_timer()  
         
@@ -416,7 +416,7 @@ def createMeshFromImage(scene, verts, faces):
         else:
             max = len(images[0])            
         
-        #goes through and for each image for each block finds new height
+        # goes through and for each image for each block finds new height
         for image_index in range(0, max, scene.cubester_skip_images):
             filepath = images[0][image_index]
             name = images[1][image_index]                                
@@ -445,7 +445,7 @@ def createMeshFromImage(scene, verts, faces):
             frames.append(frame_heights)
             frames_vert_colors.append(frame_colors)
 
-        #determine what data to use
+        # determine what data to use
         if scene.cubester_materials == "vertex" or scene.render.engine == "BLENDER_ENGINE":  
             scene.cubester_vertex_colors[ob.name] = {"type" : "vertex", "frames" : frames_vert_colors, 
                     "frame_skip" : scene.cubester_frame_step, "total_images" : max}
@@ -455,10 +455,10 @@ def createMeshFromImage(scene, verts, faces):
             att = getImageNode(ob.data.materials[0])
             att.image_user.frame_duration = len(frames) * scene.cubester_frame_step
         
-        #animate mesh   
+        # animate mesh   
         createFCurves(mesh, frames, scene.cubester_frame_step, scene.cubester_mesh_style)                                                      
                              
-#generate uv map for object       
+# generate uv map for object       
 def createUVMap(context, rows, columns):
     mesh = context.object.data
     mesh.uv_textures.new("cubester")
@@ -473,9 +473,9 @@ def createUVMap(context, rows, columns):
     
     y_pos = 0.0
     x_pos = 0.0
-    count = columns - 1 #hold current count to compare to if need to go to next row
+    count = columns - 1 # hold current count to compare to if need to go to next row
     
-    #if blocks
+    # if blocks
     if context.scene.cubester_mesh_style == "blocks":              
         for fa in range(int(len(bm.faces) / 6)):        
             for i in range(6):
@@ -492,7 +492,7 @@ def createUVMap(context, rows, columns):
                 x_pos = 0.0
                 count += columns
     
-    #if planes
+    # if planes
     else:
         for fa in range(len(bm.faces)):
             bm.faces[fa].loops[0][uv_layer].uv = (x_pos, y_pos)
@@ -509,7 +509,7 @@ def createUVMap(context, rows, columns):
                     
     bm.to_mesh(mesh)
      
-#if already loaded return image, else load and return
+# if already loaded return image, else load and return
 def fetchImage(name, load_path):
     if name in bpy.data.images:
         return bpy.data.images[name]
@@ -521,22 +521,22 @@ def fetchImage(name, load_path):
             print("CubeSter: " + load_path + " could not be loaded")
             return None 
 
-#find height for point
+# find height for point
 def findPointHeight(r, g, b, a, scene):        
-    if a != 0: #if not completely transparent                    
+    if a != 0: # if not completely transparent                    
         normalize = 1
         
-        #channel weighting
+        # channel weighting
         if not scene.cubester_advanced:
             composed = 0.25 * r + 0.25 * g + 0.25 * b + 0.25 * a
             total = 1
         else:
-            #user defined weighting
+            # user defined weighting
             if not scene.cubester_random_weights:
                 composed = scene.cubester_weight_r * r + scene.cubester_weight_g * g + scene.cubester_weight_b * b + scene.cubester_weight_a * a
                 total = scene.cubester_weight_r + scene.cubester_weight_g + scene.cubester_weight_b + scene.cubester_weight_a
                 normalize = 1 / total
-            #random weighting
+            # random weighting
             else:                           
                 composed = weights[0] * r + weights[1] * g + weights[2] * b + weights[3] * a
                 total = weights[0] + weights[1] + weights[2] + weights[3] 
@@ -552,7 +552,7 @@ def findPointHeight(r, g, b, a, scene):
     else:
         return -1 
            
-#find all images that would belong to sequence
+# find all images that would belong to sequence
 def findSequenceImages(context):
     scene = context.scene
     images = [[], []]
@@ -562,7 +562,7 @@ def findSequenceImages(context):
         main = image.name.split(".")[0]
         exstention = image.name.split(".")[1]
         
-        #first part of name to check against other files
+        # first part of name to check against other files
         length = len(main)
         keep_going = True
         for i in range(len(main) - 1, -1, -1):
@@ -584,16 +584,16 @@ def findSequenceImages(context):
         
     return images
 
-#get image node
+# get image node
 def getImageNode(mat):
     nodes = mat.node_tree.nodes
     att = nodes["Image Texture"]
     
     return att  
     
-#get the RGBA values from pixel
+# get the RGBA values from pixel
 def getPixelValues(picture, pixels, row, column):
-    i = (row * picture.size[0] * 4) + column #determin i position to start at based on row and column position             
+    i = (row * picture.size[0] * 4) + column # determine i position to start at based on row and column position             
     pixs = pixels[i:i+4]       
     r = pixs[0]
     g = pixs[1]
@@ -602,14 +602,15 @@ def getPixelValues(picture, pixels, row, column):
     
     return r, g, b, a     
 
-#frame change handler for materials
+# frame change handler for materials
 def materialFrameHandler(scene):
     frame = scene.frame_current
     
     keys = list(scene.cubester_vertex_colors.keys())
-    #get keys and see if object is still in scene
+    
+    # get keys and see if object is still in scene
     for i in keys: 
-        #if object is in scene then update information
+        # if object is in scene then update information
         if i in bpy.data.objects:
             ob = bpy.data.objects[i]        
             object = scene.cubester_vertex_colors[ob.name]            
@@ -617,7 +618,7 @@ def materialFrameHandler(scene):
             max = object["total_images"]            
             type = object["type"]    
             
-            #update materials using vertex colors
+            # update materials using vertex colors
             if type == "vertex":
                 colors = object["frames"]
                 
@@ -635,13 +636,14 @@ def materialFrameHandler(scene):
                 offset = frame - int(frame / skip_frames)             
                 att.image_user.frame_offset = -offset
                 
-        #if the object is no longer in the scene then delete then entry
+        # if the object is no longer in the scene then delete then entry
         else:
             del scene.cubester_vertex_colors[i]                   
 
-#main properties
+# main properties
 bpy.types.Scene.cubester_audio_image = EnumProperty(name = "Input Type", items = (("image", "Image", ""), ("audio", "Audio", "")))
-#audio
+
+# audio
 bpy.types.Scene.cubester_audio_path = StringProperty(default = "", name = "Audio File", subtype = "FILE_PATH") 
 bpy.types.Scene.cubester_audio_min_freq = IntProperty(name = "Minimum Frequency", min = 20, max = 100000, default = 20)
 bpy.types.Scene.cubester_audio_max_freq = IntProperty(name = "Maximum Frequency", min = 21, max = 999999, default = 5000)
@@ -650,7 +652,8 @@ bpy.types.Scene.cubester_audio_frame_offset = IntProperty(name = "Frame Offset",
 bpy.types.Scene.cubester_audio_block_layout = EnumProperty(name = "Block Layout", items = (("rectangle", "Rectangular", ""), ("radial", "Radial", "")))
 bpy.types.Scene.cubester_audio_width_blocks = IntProperty(name = "Width Block Count", min = 1, max = 10000, default = 5)
 bpy.types.Scene.cubester_audio_length_blocks = IntProperty(name = "Length Block Count", min = 1, max = 10000, default = 50)
-#image
+
+# image
 bpy.types.Scene.cubester_load_type = EnumProperty(name = "Image Input Type", items = (("single", "Single Image", ""), ("multiple", "Image Sequence", "")))
 bpy.types.Scene.cubester_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_image = StringProperty(default = "", name = "Load Image", subtype = "FILE_PATH", update = adjustSelectedImage) 
@@ -662,15 +665,18 @@ bpy.types.Scene.cubester_mesh_style = EnumProperty(name = "Mesh Type", items = (
 bpy.types.Scene.cubester_block_style = EnumProperty(name = "Block Style", items = (("size", "Vary Size", ""), ("position", "Vary Position", "")), description = "Vary Z-size of block, or vary Z-position")
 bpy.types.Scene.cubester_height_scale = FloatProperty(name = "Height Scale", subtype = "DISTANCE", min = 0.1, max = 2, default = 0.2)
 bpy.types.Scene.cubester_invert = BoolProperty(name = "Invert Height?", default = False)
-#general adjustments
+
+# general adjustments
 bpy.types.Scene.cubester_size_per_hundred_pixels = FloatProperty(name = "Size Per 100 Blocks/Points", subtype =  "DISTANCE", min = 0.001, max = 5, default = 1)
-#material based stuff
+
+# material based stuff
 bpy.types.Scene.cubester_materials = EnumProperty(name = "Material", items = (("vertex", "Vertex Colors", ""), ("image", "Image", "")), description = "Color on a block by block basis with vertex colors, or uv unwrap and use an image")
 bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Image Colors'?", default = True, description = "Use the original image for colors, otherwise specify an image to use for the colors")
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
 bpy.types.Scene.cubester_vertex_colors = {}
-#advanced
+#
+ advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanced Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
 bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)
@@ -703,10 +709,10 @@ class CubeSterPanel(bpy.types.Panel):
             box.prop(scene, "cubester_load_image")
             layout.separator()
         
-            #find number of approriate images if sequence
+            # find number of approriate images if sequence
             if scene.cubester_load_type == "multiple":
                 box = layout.box()
-                #display number of images found there            
+                # display number of images found there            
                 images = findSequenceImages(context)
                 images_found = len(images[0]) if len(images[0]) <= scene.cubester_max_images else scene.cubester_max_images
                 if len(images[0]) > 0:
@@ -730,7 +736,7 @@ class CubeSterPanel(bpy.types.Panel):
             if scene.cubester_mesh_style == "blocks":            
                 box.prop(scene, "cubester_block_style")                             
         
-        #audio file
+        # audio file
         else:               
             layout.prop(scene, "cubester_audio_path")
             layout.separator()
@@ -749,7 +755,7 @@ class CubeSterPanel(bpy.types.Panel):
              
             box.prop(scene, "cubester_size_per_hundred_pixels")  
         
-        #materials
+        # materials
         layout.separator()
         box = layout.box()    
         
@@ -760,7 +766,7 @@ class CubeSterPanel(bpy.types.Panel):
     
             #find number of approriate images if sequence
             if scene.cubester_load_type == "multiple":
-                #display number of images found there            
+                # display number of images found there            
                 images = findSequenceImages(context)
                 images_found = len(images[0]) if len(images[0]) <= scene.cubester_max_images else scene.cubester_max_images
                 if len(images[0]) > 0:
@@ -769,7 +775,7 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop(scene, "cubester_skip_images")
                 box.prop(scene, "cubester_frame_step")
            
-        #if using uvs for image, then give option to use different image for color
+        # if using uvs for image, then give option to use different image for color
         if scene.cubester_materials == "image":
             box.separator()
             
@@ -796,34 +802,34 @@ class CubeSterPanel(bpy.types.Panel):
         if scene.cubester_mesh_style == "blocks":
             slope = 0.0000876958
             intercept = 0.02501
-            image_count_slope = 0.38507396 #time added based on frames
-            image_mesh_slope = 0.002164 #time added based block count and frames
+            image_count_slope = 0.38507396 # time added based on frames
+            image_mesh_slope = 0.002164 # time added based block count and frames
         else:
             slope = 0.000017753
             intercept = 0.04201
-            image_count_slope = 0.333098622 #time added based on frames
-            image_mesh_slope = 0.000176 #time added based block count and frames
+            image_count_slope = 0.333098622 # time added based on frames
+            image_mesh_slope = 0.000176 # time added based block count and frames
         
         if scene.cubester_load_type == "single":
-            time = rows * columns * slope + intercept #approximate time count for mesh
+            time = rows * columns * slope + intercept # approximate time count for mesh
         else:
             points = rows * columns
             time = (points * slope) + intercept + (points * image_mesh_slope )+ ((images_found / (scene.cubester_skip_images + 1)) * image_count_slope)
             
         time_mod = "s"
-        if time > 60: #convert to minutes if needed
+        if time > 60: # convert to minutes if needed
             time /= 60
             time_mod = "min"
         time = round(time, 3)
         box.label("Expected Time: " + str(time) + " " + time_mod)
         
-        #expected vert/face count
+        # expected vert/face count
         if scene.cubester_mesh_style == "blocks":           
             box.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
         else:
             box.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
             
-        #advanced
+        # advanced
         layout.separator()
         box = layout.box()
         box.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
@@ -838,7 +844,7 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop(scene, "cubester_weight_b")
                 box.prop(scene, "cubester_weight_a")
         
-        #generate mesh        
+        # generate mesh        
         layout.separator()
         layout.operator("mesh.cubester", icon = "OBJECT_DATA") 
     
@@ -861,7 +867,7 @@ class CubeSter(bpy.types.Operator):
         
         stop = timeit.default_timer()
         
-        #print time to generate mesh and handle materials
+        # print time to generate mesh and handle materials
         if len(frames) == 0:
             created = 1
         else:

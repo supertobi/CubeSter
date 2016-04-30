@@ -896,7 +896,7 @@ class CubeSter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}  
     
     def execute(self, context): 
-        frames = [[],[]]
+        frames = [[1],[1]]
         verts, faces = [], []
         
         start = timeit.default_timer()         
@@ -905,17 +905,13 @@ class CubeSter(bpy.types.Operator):
         if scene.cubester_audio_image == "image":
             createMeshFromImage(scene, verts, faces)
             frames = findSequenceImages(context)
+            created = len(frames[0])
         else:
             createMeshFromAudio(scene, verts, faces)
+            created = int(scene.cubester_audio_file_length)
         
-        stop = timeit.default_timer()
-        
-        # print time to generate mesh and handle materials
-        if len(frames[0]) == 0:
-            created = 1
-        else:
-            created = len(frames[0])
-            
+        stop = timeit.default_timer()    
+                        
         if scene.cubester_mesh_style == "blocks" or scene.cubester_audio_image == "audio":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks and " + str(created) + " frame(s) in " + str(stop - start)) 
         else:

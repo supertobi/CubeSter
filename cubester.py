@@ -306,6 +306,11 @@ def createMeshFromAudio(scene, verts, faces):
         curve.select = False
         scene.objects.active = ob
         
+        # data was collected and then multi-variable regression was done in Excel
+        width_infl, length_infl, intercept = -0.159125, 0.49996, 0.007637 # influence of width and length
+        x_offset = ((width * (size * 100) * width_infl) + (length * (size * 100) * length_infl) + intercept) / 100
+        ob.location = (ob.location[0] + x_offset, ob.location[1], ob.location[2])
+        
         ob.rotation_euler = (radians(-90), 0.0, 0.0)
         bpy.ops.object.modifier_add(type = "CURVE")
         ob.modifiers["Curve"].object = curve
@@ -675,8 +680,7 @@ bpy.types.Scene.cubester_use_image_color = BoolProperty(name = "Use Original Ima
 bpy.types.Scene.cubester_color_image = StringProperty(default = "", name = "") 
 bpy.types.Scene.cubester_load_color_image = StringProperty(default = "", name = "Load Color Image", subtype = "FILE_PATH", update = adjustSelectedColorImage) 
 bpy.types.Scene.cubester_vertex_colors = {}
-#
- advanced
+# advanced
 bpy.types.Scene.cubester_advanced = BoolProperty(name = "Advanced Options?")
 bpy.types.Scene.cubester_random_weights = BoolProperty(name = "Random Weights?")
 bpy.types.Scene.cubester_weight_r = FloatProperty(name = "Red", subtype = "FACTOR", min = 0.01, max = 1.0, default = 0.25)

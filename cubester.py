@@ -314,7 +314,7 @@ def createMeshFromAudio(scene, verts, faces):
         ob.rotation_euler = (radians(-90), 0.0, 0.0)
         bpy.ops.object.modifier_add(type = "CURVE")
         ob.modifiers["Curve"].object = curve
-        ob.modifiers["Curve"].deform_axis = "POS_Z"               
+        ob.modifiers["Curve"].deform_axis = "POS_Z"            
                                       
 # generate mesh from image(s)
 def createMeshFromImage(scene, verts, faces):
@@ -802,29 +802,29 @@ class CubeSterPanel(bpy.types.Panel):
         else:
             box.label("Approximate Point Count: " + str(rows * columns))
         
-        #blocks and plane generation time values
+        # blocks and plane generation time values
         if scene.cubester_mesh_style == "blocks":
             slope = 0.0000876958
             intercept = 0.02501
-            image_count_slope = 0.38507396 # time added based on frames
-            image_mesh_slope = 0.002164 # time added based block count and frames
+            block_infl, frame_infl, intercept2 = 0.0025934, 0.38507, -0.5840189
+                        
         else:
             slope = 0.000017753
             intercept = 0.04201
-            image_count_slope = 0.333098622 # time added based on frames
-            image_mesh_slope = 0.000176 # time added based block count and frames
+            block_infl, frame_infl, intercept2 = 0.000619, 0.344636, -0.272759
         
         if scene.cubester_load_type == "single":
             time = rows * columns * slope + intercept # approximate time count for mesh
         else:
             points = rows * columns
-            time = (points * slope) + intercept + (points * image_mesh_slope )+ ((images_found / (scene.cubester_skip_images + 1)) * image_count_slope)
+            time = (points * slope) + intercept + (points * block_infl) + (images_found / scene.cubester_skip_images * frame_infl) + intercept2
             
         time_mod = "s"
         if time > 60: # convert to minutes if needed
             time /= 60
             time_mod = "min"
         time = round(time, 3)
+        
         box.label("Expected Time: " + str(time) + " " + time_mod)
         
         # expected vert/face count
@@ -833,20 +833,21 @@ class CubeSterPanel(bpy.types.Panel):
         else:
             box.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
             
-        # advanced
-        layout.separator()
-        box = layout.box()
-        box.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
-        if bpy.context.scene.cubester_advanced:
-            box.prop(scene, "cubester_random_weights", icon = "RNDCURVE")
-            box.separator()
-            
-            if not bpy.context.scene.cubester_random_weights:                
-                box.label("RGBA Channel Weights", icon = "COLOR")
-                box.prop(scene, "cubester_weight_r")
-                box.prop(scene, "cubester_weight_g")
-                box.prop(scene, "cubester_weight_b")
-                box.prop(scene, "cubester_weight_a")
+        # advanced        
+        if scene.cubester_audio_image == "image":
+            layout.separator()
+            box = layout.box()
+            box.prop(scene, "cubester_advanced", icon = "TRIA_DOWN")    
+            if bpy.context.scene.cubester_advanced:
+                box.prop(scene, "cubester_random_weights", icon = "RNDCURVE")
+                box.separator()
+                
+                if not bpy.context.scene.cubester_random_weights:                
+                    box.label("RGBA Channel Weights", icon = "COLOR")
+                    box.prop(scene, "cubester_weight_r")
+                    box.prop(scene, "cubester_weight_g")
+                    box.prop(scene, "cubester_weight_b")
+                    box.prop(scene, "cubester_weight_a")
         
         # generate mesh        
         layout.separator()
@@ -858,7 +859,7 @@ class CubeSter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}  
     
     def execute(self, context): 
-        frames = []
+        frames = [[],[]]
         verts, faces = [], []
         
         start = timeit.default_timer()         
@@ -866,16 +867,17 @@ class CubeSter(bpy.types.Operator):
         
         if scene.cubester_audio_image == "image":
             createMeshFromImage(scene, verts, faces)
+            frames = findSequenceImages(context)
         else:
             createMeshFromAudio(scene, verts, faces)
         
         stop = timeit.default_timer()
         
         # print time to generate mesh and handle materials
-        if len(frames) == 0:
+        if len(frames[0]) == 0:
             created = 1
         else:
-            created = len(frames)
+            created = len(frames[0])
             
         if scene.cubester_mesh_style == "blocks" or scene.cubester_audio_image == "audio":
             print("CubeSter: " + str(int(len(verts) / 8)) + " blocks and " + str(created) + " frame(s) in " + str(stop - start)) 

@@ -853,7 +853,7 @@ class CubeSterPanel(bpy.types.Panel):
             else:                
                 time = (points * slope) + intercept + (points * block_infl) + (images_found / scene.cubester_skip_images * frame_infl) + intercept2
                 
-                box.label("Images To Be Used: " + int(images_found / scene.cubester_skip_images))                                                 
+                box.label("Images To Be Used: " + str(int(images_found / scene.cubester_skip_images)))                                                 
                 
         # audio based mesh
         else:            

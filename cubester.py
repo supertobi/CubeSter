@@ -513,6 +513,32 @@ def createUVMap(context, rows, columns):
                 count += columns  
                     
     bm.to_mesh(mesh)
+
+# returns length in frames  
+def findAudioLength(self, context):
+    audio_file = context.scene.cubester_audio_path
+    length = 0
+    
+    if audio_file != "":
+        # confirm that strip hasn't been loaded yet
+        for strip in context.scene.sequence_editor.sequences_all:
+            if type(strip) == bpy.types.SoundSequence and strip.sound.filepath == audio_file:
+                length = strip.frame_final_duration                                      
+                    
+        if length == 0:
+            area = context.area
+            old_type = area.type
+            area.type = "SEQUENCE_EDITOR"
+                         
+            bpy.ops.sequencer.sound_strip_add(filepath = audio_file)
+            area.type = old_type    
+        
+        # find audio file
+        for strip in context.scene.sequence_editor.sequences_all:
+            if type(strip) == bpy.types.SoundSequence and strip.sound.filepath == audio_file:
+                length = strip.frame_final_duration                
+    
+    context.scene.cubester_audio_file_length = str(length)
      
 # if already loaded return image, else load and return
 def fetchImage(name, load_path):
@@ -647,9 +673,9 @@ def materialFrameHandler(scene):
 
 # main properties
 bpy.types.Scene.cubester_audio_image = EnumProperty(name = "Input Type", items = (("image", "Image", ""), ("audio", "Audio", "")))
-
+bpy.types.Scene.cubester_audio_file_length = StringProperty(default = "")
 # audio
-bpy.types.Scene.cubester_audio_path = StringProperty(default = "", name = "Audio File", subtype = "FILE_PATH") 
+bpy.types.Scene.cubester_audio_path = StringProperty(default = "", name = "Audio File", subtype = "FILE_PATH", update = findAudioLength) 
 bpy.types.Scene.cubester_audio_min_freq = IntProperty(name = "Minimum Frequency", min = 20, max = 100000, default = 20)
 bpy.types.Scene.cubester_audio_max_freq = IntProperty(name = "Maximum Frequency", min = 21, max = 999999, default = 5000)
 bpy.types.Scene.cubester_audio_offset_type = EnumProperty(name = "Offset Type", items = (("freq", "Frequency Offset", ""), ("frame", "Frame Offset", "")), description = "Type of offset per row of mesh")
@@ -750,12 +776,17 @@ class CubeSterPanel(bpy.types.Panel):
             box.prop(scene, "cubester_audio_max_freq")
             box.separator()
             box.prop(scene, "cubester_audio_offset_type")
+            
             if scene.cubester_audio_offset_type == "frame":
                 box.prop(scene, "cubester_audio_frame_offset")                
             box.separator()
+            
             box.prop(scene, "cubester_audio_block_layout")
             box.prop(scene, "cubester_audio_width_blocks")                                    
             box.prop(scene, "cubester_audio_length_blocks")
+            
+            rows = scene.cubester_audio_width_blocks
+            columns = scene.cubester_audio_length_blocks
              
             box.prop(scene, "cubester_size_per_hundred_pixels")  
         
@@ -778,9 +809,7 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop(scene, "cubester_max_images")
                 box.prop(scene, "cubester_skip_images")
                 box.prop(scene, "cubester_frame_step")
-           
-        # if using uvs for image, then give option to use different image for color
-        if scene.cubester_materials == "image":
+          
             box.separator()
             
             if scene.cubester_audio_image == "image":
@@ -791,16 +820,19 @@ class CubeSterPanel(bpy.types.Panel):
                 box.prop_search(scene, "cubester_color_image", bpy.data, "images")
                 box.prop(scene, "cubester_load_color_image")                         
         
-        if scene.cubester_image in bpy.data.images:
-            rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
-            columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))                     
+            if scene.cubester_image in bpy.data.images:
+                rows = int(bpy.data.images[scene.cubester_image].size[1] / (scene.cubester_skip_pixels + 1))
+                columns = int(bpy.data.images[scene.cubester_image].size[0] / (scene.cubester_skip_pixels + 1))                     
         
         layout.separator()
-        box = layout.box()                
+        box = layout.box()  
+                      
         if scene.cubester_mesh_style == "blocks":           
             box.label("Approximate Cube Count: " + str(rows * columns))
+            box.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
         else:
             box.label("Approximate Point Count: " + str(rows * columns))
+            box.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))                          
         
         # blocks and plane generation time values
         if scene.cubester_mesh_style == "blocks":
@@ -813,25 +845,30 @@ class CubeSterPanel(bpy.types.Panel):
             intercept = 0.04201
             block_infl, frame_infl, intercept2 = 0.000619, 0.344636, -0.272759
         
-        if scene.cubester_load_type == "single":
-            time = rows * columns * slope + intercept # approximate time count for mesh
-        else:
-            points = rows * columns
-            time = (points * slope) + intercept + (points * block_infl) + (images_found / scene.cubester_skip_images * frame_infl) + intercept2
-            
+        # if creating image based mesh        
+        points = rows * columns
+        if scene.cubester_audio_image == "image":            
+            if scene.cubester_load_type == "single":
+                time = rows * columns * slope + intercept # approximate time count for mesh
+            else:                
+                time = (points * slope) + intercept + (points * block_infl) + (images_found / scene.cubester_skip_images * frame_infl) + intercept2
+                
+                box.label("Images To Be Used: " + int(images_found / scene.cubester_skip_images))                                                 
+                
+        # audio based mesh
+        else:            
+            box.label("Audio Track Length: " + scene.cubester_audio_file_length + " frames")    
+                        
+            block_infl, frame_infl, intercept = 0.0948, 0.0687566, -25.85985
+            time = (points * block_infl) + (int(scene.cubester_audio_file_length) * frame_infl) + intercept
+                        
         time_mod = "s"
         if time > 60: # convert to minutes if needed
             time /= 60
             time_mod = "min"
         time = round(time, 3)
         
-        box.label("Expected Time: " + str(time) + " " + time_mod)
-        
-        # expected vert/face count
-        if scene.cubester_mesh_style == "blocks":           
-            box.label("Expected # Verts/Faces: " + str(rows * columns * 8) + " / " + str(rows * columns * 6))
-        else:
-            box.label("Expected # Verts/Faces: " + str(rows * columns) + " / " + str(rows * (columns - 1)))           
+        box.label("Expected Time: " + str(time) + " " + time_mod)                    
             
         # advanced        
         if scene.cubester_audio_image == "image":

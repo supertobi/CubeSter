@@ -17,10 +17,10 @@
 bl_info = {
     "name" : "CubeSter",
     "author" : "Jacob Morris",
-    "version" : (0, 5),
+    "version" : (0, 6),
     "blender" : (2, 77, 0),
     "location" : "View 3D > Toolbar > CubeSter",
-    "description" : "Takes image or image sequence and converts it into a height map based on pixel color and alpha values",
+    "description" : "Takes image, image sequence, or audio file and converts it into a height map based on pixel color and alpha values",
     "category" : "Add Mesh"
     }
     
@@ -292,6 +292,9 @@ def createMeshFromAudio(scene, verts, faces):
                 fcurves[curve].select = False               
 
     area.type = old_type 
+    
+    # UV unwrap
+    createUVMap(context, rows, int(len(faces) / 6 / rows))
     
     # if radial apply needed modifiers
     if scene.cubester_audio_block_layout == "radial":

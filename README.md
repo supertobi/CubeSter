@@ -1,5 +1,5 @@
 # CubeSter
-# # Jacob Morris
+## Jacob Morris
 
 Email Address: blendingjake@gmail.com
 

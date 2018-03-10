@@ -3,8 +3,6 @@
 
 Email Address: blendingjake@gmail.com
 
-URL: www.blendingjacob.blogspot.com
-
 CubeSter is an add-on for Blender 3D that takes an image or audio file and 
 converts it into a height-based mesh object. The mesh can either be composed 
 of multiple cubes or of a single plane. The height of the mesh is based either 

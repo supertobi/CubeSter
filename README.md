@@ -1,5 +1,5 @@
-#CubeSter by Jacob Morris
-Original Author: Jacob Morris
+# CubeSter
+# # Jacob Morris
 
 Email Address: blendingjake@gmail.com
 

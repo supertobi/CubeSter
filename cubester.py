@@ -24,18 +24,28 @@ bl_info = {
     "category": "Add Mesh"
     }
     
-from bpy.types import Scene, PropertyGroup
+from bpy.types import Scene, PropertyGroup, Object
 from bpy.props import PointerProperty
 from bpy.utils import register_class, unregister_class
+from bpy import app
 
 
-class CSProperties(PropertyGroup):
+class CSObjectProperties(PropertyGroup):
+    pass
+
+
+class CSSceneProperties(PropertyGroup):
     pass
 
 
 classes = [
-    CSProperties
+    CSObjectProperties,
+    CSSceneProperties
 ]
+
+
+def frame_handler(scene):
+    pass
 
 
 def register():
@@ -44,16 +54,27 @@ def register():
 
     Scene.cs_properties = PointerProperty(
         name="cs_properties",
-        type=CSProperties,
-        description="All the properties needed for the add-on CubeSter"
+        type=CSSceneProperties,
+        description="All the scene properties needed for the add-on CubeSter"
     )
+
+    Object.cs_properties = PointerProperty(
+        name="cs_properties",
+        type=CSObjectProperties,
+        description="All the object properties needed for the add-on CubeSter"
+    )
+
+    app.handlers.frame_change_pre.append(frame_handler)
 
 
 def unregister():
     del Scene.cs_properties
+    del Object.cs_properties
 
     for cls in classes:
         unregister_class(cls)
+
+    app.handlers.frame_change_pre.remove(frame_handler)
 
 
 if __name__ == "__main__":

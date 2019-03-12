@@ -26,7 +26,7 @@ bl_info = {
 
 from bpy.types import Scene, PropertyGroup, Object, Panel, Image, Operator
 from bpy.props import PointerProperty, EnumProperty, BoolProperty, StringProperty, CollectionProperty, IntProperty, \
-    FloatProperty
+    FloatProperty, FloatVectorProperty
 from bpy.utils import register_class, unregister_class
 from bpy import app
 from os import walk
@@ -79,11 +79,11 @@ def build_plane_mesh_from_heights(context, props, heights: List[list]):
     bpy.ops.mesh.primitive_cube_add()
     bm = bmesh.new()
     bs = props.grid_size
-    y = -(len(heights)*bs)/2
+    y = -((len(heights)-1) * bs) / 2
 
     verts, faces = [], []
     for row in heights:
-        x = -(len(heights[0])*bs)/2
+        x = -((len(heights[0])-1) * bs) / 2
 
         for height in row:
             verts.append((x, y, height))
@@ -166,11 +166,31 @@ class CSImageProperties(PropertyGroup):
     filepath: StringProperty()
 
 
+class CSVertexColor(PropertyGroup):
+    color: FloatVectorProperty(
+        size=4
+    )
+
+class CSRowColors(PropertyGroup):
+    colors: CollectionProperty(
+        type=CSVertexColor
+    )
+
+class CSFrameColorRows(PropertyGroup):
+    rows: CollectionProperty(
+        type=CSRowColors
+    )
+
+
 class CSObjectProperties(PropertyGroup):
     cs_type: EnumProperty(
         name="CubeSter type",
         items=(("none", "None", ""), ("single", "Single", ""), ("sequence", "Sequence", "")),
         default="none"
+    )
+
+    color_data: CollectionProperty(
+        type=CSFrameColorRows
     )
 
 
@@ -235,10 +255,12 @@ class CSPanel(Panel):
         layout.template_ID(props, "image", open="image.open")
 
         layout.separator()
-        layout.prop(props, "is_image_sequence", icon="RENDER_RESULT")
+        box = layout.box()
+        box.prop(props, "is_image_sequence", icon="RENDER_RESULT")
         if props.is_image_sequence:
-            layout.prop(props, "image_base_name")
-            layout.operator("object.cs_load_image_sequence")
+            box.prop(props, "image_base_name")
+            box.operator("object.cs_load_image_sequence")
+            box.label(text="Images Found: {}".format(len(props.image_sequence)))
 
         layout.separator()
         box = layout.box()
@@ -283,6 +305,8 @@ class CSLoadImageSequence(Operator):
         return {"FINISHED"}
 
 
+# TODO: make sure colors are always padded or trimmed to RGBA
+# TODO: provide an option that automatically removes images so that memory usage doesn't spike with a large sequence
 class CSCreateObject(Operator):
     bl_idname = "object.cs_create_object"
     bl_label = "Create Object"
@@ -290,12 +314,27 @@ class CSCreateObject(Operator):
 
     def execute(self, context):
         props = context.scene.cs_properties
+        images = []
+        image_data = {}
 
-        if not props.is_image_sequence:
-            w, h = props.image.size
-            channels = props.image.channels
-            pixels = list(props.image.pixels)  # 0 = bottom-left corner of image
-            sp = props.skip_pixels
+        if props.is_image_sequence:
+            for path in props.image_sequence:
+                name = Path(path.filepath).name
+                if name in bpy.data.images:
+                    images.append(bpy.data.images[name])
+                else:
+                    images.append(bpy.data.images.load(path.filepath))
+
+            self.report({"INFO"}, "Image sequence loaded.")
+        else:
+            images.append(props.image)
+
+        sp = props.skip_pixels
+        for image in images:
+            w, h = image.size
+            channels = image.channels
+            pixels = list(image.pixels)  # 0 = bottom-left corner of image
+
             height_factor = props.height / channels
 
             heights = []
@@ -317,24 +356,57 @@ class CSCreateObject(Operator):
                     else:
                         heights[-1].append(total * height_factor)
 
-            if props.mesh_type == "blocks":
-                build_block_mesh_from_heights(context, props, heights)
-                color_block_mesh(context, props, colors)
-            else:
-                build_plane_mesh_from_heights(context, props, heights)
-                color_plane_mesh(context, props, colors)
+            image_data[image] = (heights, colors)
 
-            if "CubeSter" not in bpy.data.materials:
-                create_vertex_material()
+        self.report({"INFO"}, "Image data collected.")
 
+        # build and color mesh based on first/only image
+        if props.mesh_type == "blocks":
+            build_block_mesh_from_heights(context, props, image_data[images[0]][0])
+            color_block_mesh(context, props, image_data[images[0]][1])
+        else:
+            build_plane_mesh_from_heights(context, props, image_data[images[0]][0])
+            color_plane_mesh(context, props, image_data[images[0]][1])
+
+        self.report({"INFO"}, "Mesh built.")
+
+        # materials
+        if "CubeSter" not in bpy.data.materials:
+            create_vertex_material()
+        context.object.data.materials.append(bpy.data.materials["CubeSter"])
+
+        self.report({"INFO"}, "Material added.")
+
+        # generated needed data from image sequence if one applicable
+        if props.is_image_sequence:
+            context.object.cs_properties.cs_type = "sequence"
+
+            # animate mesh
+            # TODO: animate mesh
+
+            # store color data
+            ob_props = context.object.cs_properties
+            for image in images:
+                frame = ob_props.color_data.add()
+                for row in image_data[image][1]:
+                    color_row = frame.rows.add()
+
+                    for color in row:
+                        item = color_row.colors.add()
+                        item.color = color
+
+            self.report({"INFO"}, "Vertex colors stored.")
+        else:
             context.object.cs_properties.cs_type = "single"
-            context.object.data.materials.append(bpy.data.materials["CubeSter"])
 
         return {"FINISHED"}
 
 
 classes = [
     CSImageProperties,
+    CSVertexColor,
+    CSRowColors,
+    CSFrameColorRows,
     CSObjectProperties,
     CSSceneProperties,
     CSPanel, 

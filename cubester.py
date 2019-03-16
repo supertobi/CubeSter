@@ -171,10 +171,12 @@ class CSVertexColor(PropertyGroup):
         size=4
     )
 
+
 class CSRowColors(PropertyGroup):
     colors: CollectionProperty(
         type=CSVertexColor
     )
+
 
 class CSFrameColorRows(PropertyGroup):
     rows: CollectionProperty(
@@ -201,6 +203,7 @@ class CSSceneProperties(PropertyGroup):
         update=image_update
     )
 
+    # image sequence options
     is_image_sequence: BoolProperty(
         name="Image Sequence?", default=False
     )
@@ -211,6 +214,16 @@ class CSSceneProperties(PropertyGroup):
 
     image_sequence: CollectionProperty(
         type=CSImageProperties, name="Image Sequence"
+    )
+
+    start_image_index: IntProperty(
+        name="Start Image Index", min=0, description="Of the images found, start this many in from the first",
+        default=0
+    )
+
+    step_image_index: IntProperty(
+        name="Step Image Index", min=1, description="Of the images found, only keep ones at multiples of this value",
+        default=1
     )
 
     skip_pixels: IntProperty(
@@ -260,6 +273,10 @@ class CSPanel(Panel):
         if props.is_image_sequence:
             box.prop(props, "image_base_name")
             box.operator("object.cs_load_image_sequence")
+
+            box.separator()
+            box.prop(props, "start_image_index")
+            box.prop(props, "step_image_index")
             box.label(text="Images Found: {}".format(len(props.image_sequence)))
 
         layout.separator()
@@ -298,7 +315,8 @@ class CSLoadImageSequence(Operator):
 
         image_files.sort()
 
-        for file in image_files:
+        for fi in range(props.start_image_index, len(image_files), props.step_image_index):
+            file = image_files[fi]
             img = props.image_sequence.add()
             img.filepath = str(dir_path / file)
 
@@ -380,9 +398,29 @@ class CSCreateObject(Operator):
         # generated needed data from image sequence if one applicable
         if props.is_image_sequence:
             context.object.cs_properties.cs_type = "sequence"
+            mesh = context.object.data
 
             # animate mesh
-            # TODO: animate mesh
+            action = bpy.data.actions.new("CubeSter Animation: {}".format(context.object.name))
+
+            mesh.animation_data_create()
+            mesh.animation_data.action = action
+
+            vertex_index = 4 if props.mesh_type == "blocks" else 0  # index of first vertex
+            vertex_count = 4 if props.mesh_type == "blocks" else 1  # number of vertices the need changed
+
+            rows, columns = len(image_data[images[0]][0]), len(image_data[images[0]][0][0])
+            for r in range(rows):
+                for c in range(columns):
+                    for _ in range(vertex_count):
+                        for frame in range(len(images)):
+                            mesh.vertices[vertex_index].co.z = image_data[images[frame]][0][r][c]
+                            mesh.vertices[vertex_index].keyframe_insert('co', index=2, frame=frame)
+
+                        vertex_index += 1
+
+                    if props.mesh_type == "blocks":  # skip vertices for bottom of block
+                        vertex_index += 4
 
             # store color data
             ob_props = context.object.cs_properties

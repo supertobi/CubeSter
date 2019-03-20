@@ -148,7 +148,32 @@ def color_plane_mesh(context, props, colors: List[list]):
 
 
 def frame_handler(scene):
-    pass
+    """
+    Update all image sequence CubeSter objects to have the correct colors for the current frame
+    :param scene: the current scene
+    """
+    layer = bpy.context.object.data.vertex_colors[0].data
+
+    for ob in scene.objects:
+        ob_props = ob.cs_properties
+        frame = scene.frame_current
+
+        if ob_props.cs_type == "sequence" and 0 <= frame < len(ob_props.color_data):
+            i = 0
+            if ob_props.mesh_type == "blocks":
+                for row in ob_props.color_data[frame].rows:
+                    for color in row.colors:
+                        for _ in range(24):  # 6 faces, 4 vertices each
+                            layer[i].color = color.color
+                            i += 1
+            else:
+                # stop one short as there is one less row and column of vertices when the type is plane
+                rows = ob_props.color_data[frame].rows
+                for r in range(len(rows)-1):
+                    for c in range(len(rows[0].colors)-1):
+                        for _ in range(4):
+                            layer[i].color = rows[r].colors[c].color
+                            i += 1
 
 
 def image_update(_, context):
@@ -193,6 +218,12 @@ class CSObjectProperties(PropertyGroup):
 
     color_data: CollectionProperty(
         type=CSFrameColorRows
+    )
+
+    mesh_type: EnumProperty(
+        name="Mesh Type",
+        items=(("blocks", "Blocks", ""), ("plane", "Plane", "")),
+        description="Whether the mesh is a plane or composed of many blocks"
     )
 
 
@@ -323,7 +354,6 @@ class CSLoadImageSequence(Operator):
         return {"FINISHED"}
 
 
-# TODO: make sure colors are always padded or trimmed to RGBA
 # TODO: provide an option that automatically removes images so that memory usage doesn't spike with a large sequence
 class CSCreateObject(Operator):
     bl_idname = "object.cs_create_object"
@@ -351,6 +381,8 @@ class CSCreateObject(Operator):
         for image in images:
             w, h = image.size
             channels = image.channels
+            channels_index = channels if channels <= 4 else 4
+            padding = [1] * (4 - image.channels)
             pixels = list(image.pixels)  # 0 = bottom-left corner of image
 
             height_factor = props.height / channels
@@ -367,7 +399,7 @@ class CSCreateObject(Operator):
                     for i in range(channels):
                         total += pixels[pos + i]
 
-                    colors[-1].append(pixels[pos:pos+channels])
+                    colors[-1].append(pixels[pos:pos+channels_index] + padding)
 
                     if props.invert:
                         heights[-1].append((channels-total) * height_factor)
@@ -437,6 +469,7 @@ class CSCreateObject(Operator):
         else:
             context.object.cs_properties.cs_type = "single"
 
+        context.object.cs_properties.mesh_type = props.mesh_type
         return {"FINISHED"}
 
 

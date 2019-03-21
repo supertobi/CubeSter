@@ -285,6 +285,16 @@ class CSSceneProperties(PropertyGroup):
         description="Whether the mesh is a plane or composed of many blocks"
     )
 
+    # advanced
+    show_advanced: BoolProperty(
+        name="Show Advanced", default=False
+    )
+
+    remove_images: BoolProperty(
+        name="Remove Images On Creation", default=False,
+        description="Remove images as quickly as possible to save memory. Useful with image sequences."
+    )
+
 
 class CSPanel(Panel):
     bl_idname = "OBJECT_PT_cs_panel"
@@ -317,13 +327,21 @@ class CSPanel(Panel):
         box.prop(props, "grid_size")
 
         layout.separator()
-        layout.prop(props, "invert")
+        layout.prop(props, "invert", icon="DECORATE_OVERRIDE")
 
         layout.separator()
         layout.prop(props, "mesh_type")
 
         layout.separator()
-        layout.operator("object.cs_create_object")
+        layout.operator("object.cs_create_object", icon="MESH_CUBE")
+
+        layout.separator()
+        box = layout.box()
+        box.prop(props, "show_advanced", icon="TRIA_DOWN" if props.show_advanced else "TRIA_RIGHT")
+
+        if props.show_advanced:
+            box.separator()
+            box.prop(props, "remove_images", icon="FAKE_USER_OFF")
 
 
 class CSLoadImageSequence(Operator):
@@ -354,7 +372,6 @@ class CSLoadImageSequence(Operator):
         return {"FINISHED"}
 
 
-# TODO: provide an option that automatically removes images so that memory usage doesn't spike with a large sequence
 class CSCreateObject(Operator):
     bl_idname = "object.cs_create_object"
     bl_label = "Create Object"
@@ -363,7 +380,7 @@ class CSCreateObject(Operator):
     def execute(self, context):
         props = context.scene.cs_properties
         images = []
-        image_data = {}
+        image_data = []
 
         if props.is_image_sequence:
             for path in props.image_sequence:
@@ -406,17 +423,21 @@ class CSCreateObject(Operator):
                     else:
                         heights[-1].append(total * height_factor)
 
-            image_data[image] = (heights, colors)
+            image_data.append((heights, colors))
+
+            # if cleaning up images immediately
+            if props.remove_images:
+                bpy.data.images.remove(image)
 
         self.report({"INFO"}, "Image data collected.")
 
         # build and color mesh based on first/only image
         if props.mesh_type == "blocks":
-            build_block_mesh_from_heights(context, props, image_data[images[0]][0])
-            color_block_mesh(context, props, image_data[images[0]][1])
+            build_block_mesh_from_heights(context, props, image_data[0][0])
+            color_block_mesh(context, props, image_data[0][1])
         else:
-            build_plane_mesh_from_heights(context, props, image_data[images[0]][0])
-            color_plane_mesh(context, props, image_data[images[0]][1])
+            build_plane_mesh_from_heights(context, props, image_data[0][0])
+            color_plane_mesh(context, props, image_data[0][1])
 
         self.report({"INFO"}, "Mesh built.")
 
@@ -441,12 +462,12 @@ class CSCreateObject(Operator):
             vertex_index = 4 if props.mesh_type == "blocks" else 0  # index of first vertex
             vertex_count = 4 if props.mesh_type == "blocks" else 1  # number of vertices the need changed
 
-            rows, columns = len(image_data[images[0]][0]), len(image_data[images[0]][0][0])
+            rows, columns = len(image_data[0][0]), len(image_data[0][0][0])
             for r in range(rows):
                 for c in range(columns):
                     for _ in range(vertex_count):
                         for frame in range(len(images)):
-                            mesh.vertices[vertex_index].co.z = image_data[images[frame]][0][r][c]
+                            mesh.vertices[vertex_index].co.z = image_data[frame][0][r][c]
                             mesh.vertices[vertex_index].keyframe_insert('co', index=2, frame=frame)
 
                         vertex_index += 1
@@ -456,9 +477,9 @@ class CSCreateObject(Operator):
 
             # store color data
             ob_props = context.object.cs_properties
-            for image in images:
+            for _, colors in image_data:
                 frame = ob_props.color_data.add()
-                for row in image_data[image][1]:
+                for row in colors:
                     color_row = frame.rows.add()
 
                     for color in row:

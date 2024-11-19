@@ -125,28 +125,56 @@ def create_vertex_material():
 
 
 def color_block_mesh(context, props, colors: List[list]):
-    bpy.ops.mesh.vertex_color_add()
-    layer = context.object.data.vertex_colors[0].data
+    # Ensure we are in Object Mode before making changes
+    bpy.ops.object.mode_set(mode='OBJECT')
 
-    i = 0
-    for row in colors:
-        for color in row:
-            for _ in range(24):  # 6 faces, 4 vertices each
-                layer[i].color = color
-                i += 1
+    # Get the active object
+    obj = context.object
+
+    # Check if the object is a mesh
+    if obj and obj.type == 'MESH':
+        # Create a new vertex color layer if it doesn't exist
+        if not obj.data.vertex_colors.get("Col"):
+            obj.data.vertex_colors.new(name="Col")
+
+        # Access the vertex color layer
+        layer = obj.data.vertex_colors["Col"].data
+
+        i = 0
+        for row in colors:
+            for color in row:
+                for _ in range(24):  # 6 faces, 4 vertices each
+                    layer[i].color = color
+                    i += 1
+    else:
+        print("Active object is not a mesh.")
 
 
 def color_plane_mesh(context, props, colors: List[list]):
-    bpy.ops.mesh.vertex_color_add()
-    layer = context.object.data.vertex_colors[0].data
+    # Ensure we are in Object Mode before making changes
+    bpy.ops.object.mode_set(mode='OBJECT')
 
-    i = 0
-    # there is one less row and column of faces then the number of rows and columns of vertices, so stop one short
-    for r in range(len(colors) - 1):
-        for c in range(len(colors[0]) - 1):
-            for _ in range(4):
-                layer[i].color = colors[r][c]
-                i += 1
+    # Get the active object
+    obj = context.object
+
+    # Check if the object is a mesh
+    if obj and obj.type == 'MESH':
+        # Create a new vertex color layer if it doesn't exist
+        if not obj.data.vertex_colors.get("Col"):
+            obj.data.vertex_colors.new(name="Col")
+
+        # Access the vertex color layer
+        layer = obj.data.vertex_colors["Col"].data
+
+        i = 0
+        # there is one less row and column of faces then the number of rows and columns of vertices, so stop one short
+        for r in range(len(colors) - 1):
+            for c in range(len(colors[0]) - 1):
+                for _ in range(4):
+                    layer[i].color = colors[r][c]
+                    i += 1
+    else:
+        print("Active object is not a mesh.")
 
 
 def frame_handler(scene):

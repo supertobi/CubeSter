@@ -12,27 +12,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Original Author = Jacob Morris
-# URL = github.com/BlendingJake
+# URL = https://github.com/supertobi/CubeSter
 
 bl_info = {
     "name": "CubeSter",
-    "author": "Jacob Morris",
-    "version": (1, 0, 0),
+    "author": "Jacob Morris, Tobias Jakobs",
+    "version": (1, 1, 0),
     "blender": (2, 80, 0),
     "location": "View 3D > Toolbar > CubeSter",
     "description": "Take an image, image sequence, or audio file and use it to generate a cube-based mesh.",
     "category": "Add Mesh"
 }
 
-from bpy.types import Scene, PropertyGroup, Object, Panel, Image, Operator
-from bpy.props import PointerProperty, EnumProperty, BoolProperty, StringProperty, CollectionProperty, IntProperty, \
+from bpy        import app
+from bpy.path   import abspath
+from bpy.props  import PointerProperty, EnumProperty, BoolProperty, StringProperty, CollectionProperty, IntProperty, \
     FloatProperty, FloatVectorProperty
-from bpy.utils import register_class, unregister_class
-from bpy import app
-from os import walk
-from bpy.path import abspath
-from pathlib import Path
-from typing import List
+from bpy.types  import Scene, PropertyGroup, Object, Panel, Image, Operator
+from bpy.utils  import register_class, unregister_class
+
+from os         import walk
+from pathlib    import Path
+from typing     import List
+
 import bpy
 import bmesh
 

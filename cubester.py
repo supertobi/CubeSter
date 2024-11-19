@@ -263,7 +263,12 @@ class CSSceneProperties(PropertyGroup):
         type=Image,
         update=image_update
     )
-
+    
+    hightmap: PointerProperty(
+        name="Hightmap",
+        type=Image
+    )
+    
     # image sequence options
     is_image_sequence: BoolProperty(
         name="Image Sequence?", default=False
@@ -336,7 +341,8 @@ class CSPanel(Panel):
         layout = self.layout
         props = context.scene.cs_properties
 
-        layout.template_ID(props, "image", open="image.open")
+        layout.template_ID(props, "image", open="image.open", text='Image')
+        layout.template_ID(props, "hightmap", open="image.open", text='Hightmap')
 
         layout.separator()
         box = layout.box()
@@ -424,7 +430,7 @@ class CSCreateObject(Operator):
         else:
             images.append(props.image)
 
-        sp = props.skip_pixels
+        skip_pixels = props.skip_pixels
         for image in images:
             w, h = image.size
             channels = image.channels
@@ -436,10 +442,10 @@ class CSCreateObject(Operator):
 
             heights = []
             colors = []
-            for r in range(0, h, sp):
+            for r in range(0, h, skip_pixels):
                 heights.append([])
                 colors.append([])
-                for c in range(0, w, sp):
+                for c in range(0, w, skip_pixels):
                     pos = ((r * w) + c) * channels
                     total = 0
 
@@ -459,7 +465,36 @@ class CSCreateObject(Operator):
             if props.remove_images:
                 bpy.data.images.remove(image)
 
+        hightmap = props.hightmap
+        if hightmap is not None and hightmap.name:
+            w, h = hightmap.size
+            channels = hightmap.channels
+            channels_index = channels if channels <= 4 else 4
+            padding = [1] * (4 - hightmap.channels)
+            pixels = list(hightmap.pixels)  # 0 = bottom-left corner of hightmap
+
+            height_factor = props.height / channels
+
+            heights = []
+            for r in range(0, h, skip_pixels):
+                heights.append([])
+                for c in range(0, w, skip_pixels):
+                    pos = ((r * w) + c) * channels
+                    total = 0
+
+                    for i in range(channels):
+                        total += pixels[pos + i]
+
+                    if props.invert:
+                        heights[-1].append((channels-total) * height_factor)
+                    else:
+                        heights[-1].append(total * height_factor)
+                        
+            image_data = []
+            image_data.append((heights, colors))
+            
         self.report({"INFO"}, "Image data collected.")
+
 
         # build and color mesh based on first/only image
         if props.mesh_type == "blocks":
